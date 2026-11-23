@@ -17,6 +17,10 @@ class Sammlung:
         bestand.vorbereiten(self.db)
         self.db.execute("""CREATE TABLE IF NOT EXISTS wunsch (id INTEGER PRIMARY KEY, isrc TEXT, stand TEXT, text TEXT,
             anschluss TEXT, erstellt INTEGER, geaendert INTEGER, pfad TEXT, daten TEXT)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS folge (kid TEXT PRIMARY KEY, name TEXT, seit INTEGER,
+            automatisch INTEGER, bekannt TEXT)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS neuheit (album_id TEXT PRIMARY KEY, kid TEXT, kuenstler TEXT, name TEXT,
+            art TEXT, datum TEXT, cover TEXT, gefunden INTEGER, gesehen INTEGER DEFAULT 0)""")
         self.db.commit()
 
     # MARK: Katalog
@@ -150,6 +154,78 @@ class Sammlung:
         with self.sperre:
             self.db.execute("DELETE FROM wunsch WHERE id = ?", (id,))
             self.db.commit()
+
+    # MARK: Folgen
+
+    def _veroeffentlichungen(self, kid: str) -> list[tuple[str, dict]]:
+        """Alben und Singles, die schon erschienen sind (frisch vom Katalog)."""
+        heute = time.strftime("%Y-%m-%d")
+        return [(v, a) for v in abgleich.HEIMAT for a in self.katalog.ansicht(kid, v, frisch=True)
+                if (a["attributes"].get("releaseDate") or "9999") <= heute]
+
+    def folgen(self, kid: str, automatisch: bool = False) -> dict:
+        """Ab jetzt zählt nur, was neu erscheint; das Bisherige gilt als bekannt."""
+        with self.sperre:
+            name = self.katalog.kuenstler(kid)["attributes"]["name"]
+            bekannt = [a["id"] for _, a in self._veroeffentlichungen(kid)]
+            alt = self.db.execute("SELECT bekannt FROM folge WHERE kid = ?", (kid,)).fetchone()
+            self.db.execute("REPLACE INTO folge VALUES (?,?,?,?,?)", (kid, name, int(time.time()), int(automatisch),
+                            alt[0] if alt else json.dumps(bekannt)))
+            self.db.commit()
+            return {"apple_id": kid, "name": name, "automatisch": automatisch}
+
+    def entfolgen(self, kid: str):
+        with self.sperre:
+            self.db.execute("DELETE FROM folge WHERE kid = ?", (kid,))
+            self.db.commit()
+
+    def gefolgt(self) -> list[dict]:
+        with self.sperre:
+            return [{"apple_id": k, "name": n, "seit": s, "automatisch": bool(a)}
+                    for k, n, s, a in self.db.execute("SELECT kid, name, seit, automatisch FROM folge ORDER BY name")]
+
+    def neuheiten(self, alle: bool = False) -> list[dict]:
+        with self.sperre:
+            spalten = ["album_id", "kuenstler_id", "kuenstler", "name", "art", "datum", "cover", "gefunden", "gesehen"]
+            return [dict(zip(spalten, z)) for z in self.db.execute(
+                "SELECT * FROM neuheit" + ("" if alle else " WHERE gesehen = 0") + " ORDER BY datum DESC")]
+
+    def gesehen(self, album_ids: list[str] | None = None):
+        with self.sperre:
+            if album_ids is None:
+                self.db.execute("UPDATE neuheit SET gesehen = 1")
+            else:
+                self.db.executemany("UPDATE neuheit SET gesehen = 1 WHERE album_id = ?", [(i,) for i in album_ids])
+            self.db.commit()
+
+    def pruefen(self) -> list[dict]:
+        """Neuerscheinungen aller gefolgten Künstler suchen. Bei „automatisch“ gleich wünschen."""
+        neu = []
+        for f in self.gefolgt():
+            try:
+                with self.sperre:
+                    bekannt = set(json.loads(self.db.execute("SELECT bekannt FROM folge WHERE kid = ?", (f["apple_id"],)).fetchone()[0]))
+                    jetzt = self._veroeffentlichungen(f["apple_id"])
+                    for v, a in jetzt:
+                        if a["id"] in bekannt:
+                            continue
+                        at = a["attributes"]
+                        cover = (at.get("artwork") or {}).get("url", "").replace("{w}", "600").replace("{h}", "600")
+                        self.db.execute("INSERT OR IGNORE INTO neuheit VALUES (?,?,?,?,?,?,?,?,0)",
+                                        (a["id"], f["apple_id"], f["name"], at["name"], abgleich.ART[v], at.get("releaseDate"), cover, int(time.time())))
+                        neu.append({"album_id": a["id"], "kuenstler": f["name"], "name": at["name"], "art": abgleich.ART[v], "automatisch": f["automatisch"]})
+                    self.db.execute("UPDATE folge SET bekannt = ? WHERE kid = ?", (json.dumps(sorted(bekannt | {a["id"] for _, a in jetzt})), f["apple_id"]))
+                    self.db.commit()
+            except Exception as fehler:
+                print(f"Neuerscheinungen {f['name']}: {fehler}", flush=True)
+        for n in neu:
+            print(f"Neu: {n['kuenstler']} – {n['name']} ({n['art']})", flush=True)
+            if n["automatisch"]:
+                try:
+                    self.wuenschen("album", n["album_id"])
+                except Exception as fehler:
+                    print(f"Wunsch {n['name']}: {fehler}", flush=True)
+        return neu
 
     # MARK: Einsortieren
 

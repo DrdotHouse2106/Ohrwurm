@@ -41,13 +41,13 @@ class Katalog:
     def _neuer_token(self):
         self._token = token(os.environ["APPLE_TEAM_ID"], os.environ["APPLE_KEY_ID"], os.environ["APPLE_SCHLUESSEL"])
 
-    def hole(self, pfad: str) -> dict | None:
+    def hole(self, pfad: str, frisch: bool = False) -> dict | None:
         """GET mit Zwischenspeicher. 404 (leere Ansicht) → None. 401 bei neuem Schlüssel: neu versuchen."""
         url = pfad if pfad.startswith("http") else BASIS + pfad
         if not url.startswith(BASIS + "/"):   # Token nie an fremde Hosts
             raise ValueError(f"Unerwartete Adresse: {url}")
         z = self.db.execute("SELECT zeit, json FROM zwischenspeicher WHERE url=?", (url,)).fetchone()
-        if z and time.time() - z[0] < self.gueltig:
+        if z and time.time() - z[0] < (3600 if frisch else self.gueltig):
             return json.loads(z[1]) if z[1] else None
         for versuch in range(4):
             if not self._token or versuch:
@@ -69,11 +69,11 @@ class Katalog:
         self.db.commit()
         return json.loads(text) if text else None
 
-    def alle(self, pfad: str) -> list[dict]:
+    def alle(self, pfad: str, frisch: bool = False) -> list[dict]:
         """Alle Seiten einer Liste (über „next“)."""
         ergebnis = []
         while pfad:
-            j = self.hole(pfad)
+            j = self.hole(pfad, frisch)
             if not j:
                 break
             ergebnis += j.get("data", [])
@@ -88,8 +88,8 @@ class Katalog:
     def kuenstler(self, id: str) -> dict:
         return self.hole(f"/v1/catalog/{self.land}/artists/{id}")["data"][0]
 
-    def ansicht(self, id: str, ansicht: str) -> list[dict]:
-        return self.alle(f"/v1/catalog/{self.land}/artists/{id}/view/{ansicht}?limit=100")
+    def ansicht(self, id: str, ansicht: str, frisch: bool = False) -> list[dict]:
+        return self.alle(f"/v1/catalog/{self.land}/artists/{id}/view/{ansicht}?limit=100", frisch)
 
     def lieder(self, album_id: str) -> list[dict]:
         return self.alle(f"/v1/catalog/{self.land}/albums/{album_id}/tracks?limit=100")

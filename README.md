@@ -12,6 +12,9 @@ Verwaltet eine private Musiksammlung mit dem Katalog von Apple Music als Vorlage
 | `bericht 32940 [--datei x.md]` | Abgleich: was es gibt, was da ist, was fehlt, was doppelt ist |
 | `wuenschen lied\|album\|kuenstler ID` | Wünsche anlegen (nur Lieder, die noch fehlen) |
 | `einsortieren PFAD` | Eine Datei erkennen, taggen und ablegen |
+| `folgen [ID] [--automatisch]` | Künstler folgen (ohne ID: Liste). Mit `--automatisch` werden Neuerscheinungen gleich gewünscht |
+| `entfolgen ID` | Nicht mehr folgen |
+| `neuheiten` / `pruefen` | Neuerscheinungen anzeigen / jetzt suchen (der Dienst sucht täglich von selbst) |
 
 Mit Docker: `docker compose run --rm ohrwurm bericht 32940` (Vorlage: [docker-compose.yml](docker-compose.yml)). Ohne Docker: `python3 -m ohrwurm …`, dazu `ffmpeg`/`ffprobe` und `openssl`.
 
@@ -55,3 +58,8 @@ Alle Aufrufe mit `Authorization: Bearer <ZUGANG>`.
 | `DELETE /api/wuensche/{id}` | Wunsch entfernen |
 | `POST /api/wuensche/{id}/stand` | `{"stand": "…", "text": "…"}` |
 | `POST /api/eingang` | `{"pfad": "…", "wunsch": id}` – Datei sofort einsortieren |
+| `GET /api/folgen` | Gefolgte Künstler |
+| `POST /api/folgen` | `{"apple_id": "…", "automatisch": true}` |
+| `DELETE /api/folgen/{id}` | Nicht mehr folgen |
+| `GET /api/neuheiten[?alle=1]` | Neuerscheinungen (ungesehen bzw. alle) |
+| `POST /api/neuheiten/gesehen` | `{"album_ids": […]}` oder `{}` für alle |

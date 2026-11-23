@@ -1,4 +1,4 @@
-"""Befehle: dienst · einlesen · suche NAME · bericht ID|NAME [--datei PFAD] · wuenschen ART ID · einsortieren PFAD"""
+"""Befehle: dienst · einlesen · suche · bericht · wuenschen · einsortieren · folgen · entfolgen · neuheiten · pruefen"""
 import argparse, os, sys, threading
 from . import abgleich, anschluesse, bestand, dienst
 from .sammlung import Sammlung
@@ -17,6 +17,12 @@ def main():
     w.add_argument("art", choices=["lied", "album", "kuenstler"])
     w.add_argument("apple_id")
     u.add_parser("einsortieren", help="Eine Datei erkennen, taggen und ablegen").add_argument("pfad")
+    f = u.add_parser("folgen", help="Künstler folgen (ohne ID: Liste)")
+    f.add_argument("apple_id", nargs="?")
+    f.add_argument("--automatisch", action="store_true", help="Neuerscheinungen gleich wünschen")
+    u.add_parser("entfolgen").add_argument("apple_id")
+    u.add_parser("neuheiten", help="Neuerscheinungen anzeigen")
+    u.add_parser("pruefen", help="Jetzt nach Neuerscheinungen suchen")
     a = p.parse_args()
 
     musik = [os.path.abspath(o) for o in os.environ.get("MUSIK", "/musik").split(":")]
@@ -43,10 +49,24 @@ def main():
     elif a.befehl == "einsortieren":
         if ziel := s.einsortieren(os.path.abspath(a.pfad)):
             print(ziel)
+    elif a.befehl == "folgen":
+        if a.apple_id:
+            print(s.folgen(a.apple_id, a.automatisch))
+        for g in s.gefolgt():
+            print(g["apple_id"], g["name"], "(automatisch wünschen)" if g["automatisch"] else "")
+    elif a.befehl == "entfolgen":
+        s.entfolgen(a.apple_id)
+    elif a.befehl == "neuheiten":
+        for n in s.neuheiten():
+            print(n["datum"], n["kuenstler"], "–", n["name"], f"({n['art']})")
+    elif a.befehl == "pruefen":
+        anschluesse.Anschluesse(s, os.environ.get("ANSCHLUESSE"))
+        print(f"{len(s.pruefen())} neu")
     elif a.befehl == "dienst":
         zugang = os.environ.get("ZUGANG") or sys.exit("ZUGANG fehlt (Schlüssel für die Schnittstelle)")
         a_ = anschluesse.Anschluesse(s, os.environ.get("ANSCHLUESSE"))
         threading.Thread(target=a_.regelmaessig, daemon=True).start()
+        threading.Thread(target=dienst.neuheiten_pruefen, args=(s,), daemon=True).start()
         if s.eingang:
             os.makedirs(s.eingang, exist_ok=True)
             threading.Thread(target=dienst.eingang_ueberwachen, args=(s,), daemon=True).start()

@@ -25,10 +25,21 @@ def eingang_ueberwachen(s, alle: int = 30, ruhe: int = 60):
         time.sleep(alle)
 
 
+def neuheiten_pruefen(s, stunden: int = 24):
+    time.sleep(300)   # nach dem Start kurz warten
+    while True:
+        try:
+            s.pruefen()
+        except Exception:
+            traceback.print_exc()
+        time.sleep(stunden * 3600)
+
+
 def kuenstler_json(s, kid: str) -> dict:
     with s.sperre:
         k, ansichten, lieder, rest = s.kuenstler_abgleich(kid)
         gewuenscht = {w["isrc"] or w["apple_id"]: w["stand"] for w in s.wuensche()}
+        folge = next((f for f in s.gefolgt() if f["apple_id"] == kid), None)
     je_album = {}
     for l in lieder:
         je_album.setdefault(l.heimat["id"], []).append(l)
@@ -38,7 +49,7 @@ def kuenstler_json(s, kid: str) -> dict:
                 "cover": (at.get("artwork") or {}).get("url", "").replace("{w}", "600").replace("{h}", "600"),
                 "lieder": [{"apple_id": l.roh.get("id"), "isrc": l.isrc, "titel": l.titel, "dauer": l.dauer, "vorhanden": bool(l.dateien), "andere_fassung": bool(l.fassungen) and not l.dateien,
                             "wunsch": gewuenscht.get(l.isrc or l.roh.get("id"))} for l in je_album.get(a["id"], [])] if art in abgleich.HEIMAT else None}
-    return {"id": k["id"], "name": k["attributes"]["name"],
+    return {"id": k["id"], "name": k["attributes"]["name"], "gefolgt": bool(folge), "automatisch": bool(folge and folge["automatisch"]),
             "zahlen": {"lieder": len(lieder), "vorhanden": sum(1 for l in lieder if l.dateien), "andere_fassung": sum(1 for l in lieder if l.fassungen and not l.dateien),
                        "doppelt": sum(1 for l in lieder if len(l.dateien) > 1), "nicht_zugeordnet": len(rest)},
             "abschnitte": [{"art": v, "titel": t, "veroeffentlichungen": [album(a, v) for a in sorted(ansichten[v], key=lambda a: a["attributes"].get("releaseDate") or "", reverse=True)]}
@@ -79,6 +90,16 @@ def starten(s, port: int, zugang: str, adresse: str = "127.0.0.1"):
                     s.loeschen(int(m[1])); return self.antwort(200, {"status": "ok"})
                 if methode == "POST" and (m := re.fullmatch(r"/api/wuensche/(\d+)/stand", pfad)):
                     s.stand(int(m[1]), koerper["stand"], koerper.get("text", ""), koerper.get("anschluss")); return self.antwort(200, {"status": "ok"})
+                if methode == "GET" and pfad == "/api/folgen":
+                    return self.antwort(200, s.gefolgt())
+                if methode == "POST" and pfad == "/api/folgen":
+                    return self.antwort(200, s.folgen(str(koerper["apple_id"]), bool(koerper.get("automatisch"))))
+                if methode == "DELETE" and (m := re.fullmatch(r"/api/folgen/(\d+)", pfad)):
+                    s.entfolgen(m[1]); return self.antwort(200, {"status": "ok"})
+                if methode == "GET" and pfad == "/api/neuheiten":
+                    return self.antwort(200, s.neuheiten(werte.get("alle") == "1"))
+                if methode == "POST" and pfad == "/api/neuheiten/gesehen":
+                    s.gesehen(koerper.get("album_ids")); return self.antwort(200, {"status": "ok"})
                 if methode == "POST" and pfad == "/api/eingang":
                     return self.antwort(200, {"pfad": s.einsortieren(koerper["pfad"], koerper.get("wunsch"))})
                 return self.antwort(404, {"text": "Unbekannt"})

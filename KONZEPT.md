@@ -68,6 +68,6 @@ Ohrregal bekommt eine Künstlerseite im Apple-Stil (Alben, Singles & EPs, Zusamm
 
 1. ✓ **Katalog und Abgleich, nur lesen.** Bericht je Künstler: was es bei Apple gibt, was da ist, was fehlt, welche Dateien doppelt sind. Probe mit N4C und Michael Jackson.
 2. ✓ **Wunschliste, Schnittstelle, Eingang, Anschlüsse** (Erkennen, Taggen, Ablegen).
-3. **Folgen und Neuerscheinungen.**
+3. ✓ **Folgen und Neuerscheinungen.** Beim Folgen gilt alles Bisherige als bekannt; täglich wird nach neuen Alben und Singles gesucht (Vorankündigungen erst ab Erscheinen).
 4. **Ohrregal-Oberfläche** (iPhone, später TV).
 5. **Apple-Music-Mediathek und Wiedergabelisten** als Vorlage (Music-User-Token nach Anmeldung mit der Apple-ID).
