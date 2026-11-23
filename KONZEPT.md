@@ -26,17 +26,32 @@ Ohrwurm weiß, was es gibt, was da ist und was gewünscht wird, und sortiert neu
 
 ## Anschlüsse (eigene Erweiterungen)
 
-Ein Anschluss braucht nur drei Dinge:
+Anschlüsse werden direkt in Ohrwurm eingebunden.
 
-1. **Offene Wünsche holen**
-   `GET /api/wuensche?status=offen` → Liste mit `id`, `isrc`, `kuenstler`, `titel`, `album`, `upc`, `dauer`, `apple_id`, `art` (album/single).
-   Oder: Ohrwurm ruft bei jedem neuen Wunsch eine eingestellte Adresse auf (`OHRWURM_MELDEN_AN`, POST mit demselben JSON).
-2. **Stand melden** (freiwillig)
-   `POST /api/wuensche/{id}/stand` mit `{"stand": "in_arbeit" | "fehlgeschlagen", "text": "…"}`.
-3. **Dateien abliefern**
-   In den Eingangsordner legen. Optional mit Zuordnung: `POST /api/eingang` mit `{"pfad": "…", "wunsch": id}`. Dann ist die Erkennung sicher, auch ohne ISRC-Tag.
+**Eingebaut:** Jede Python-Datei im Ordner `anschluesse/` (auf dem Server, als Laufwerk eingebunden) wird beim Start geladen und läuft im Dienst mit. Sie kann diese Funktionen anbieten, alle freiwillig:
 
-Ein Anschluss kann ein Skript, ein Cronjob oder ein eigener Dienst sein.
+```python
+NAME = "Mein Anschluss"
+
+def neuer_wunsch(wunsch, ohrwurm):
+    """Wird bei jedem neuen Wunsch aufgerufen (eigener Thread).
+    wunsch: dict mit id, isrc, kuenstler, titel, album, upc, dauer, apple_id, art
+    ohrwurm.stand(wunsch["id"], "in_arbeit" | "fehlgeschlagen", text="…")
+    ohrwurm.abliefern(pfad, wunsch["id"])   # Datei einsortieren, sicher zugeordnet
+    ohrwurm.einstellung("SCHLUESSEL")       # liest Umgebungsvariable ANSCHLUSS_SCHLUESSEL
+    """
+
+def regelmaessig(offene_wuensche, ohrwurm):
+    """Wird alle 15 Minuten mit allen offenen Wünschen aufgerufen (z. B. für Wiederholungen)."""
+```
+
+Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert.
+
+**Von außen** geht es genauso über HTTP:
+
+1. `GET /api/wuensche?status=offen` oder Meldung an `OHRWURM_MELDEN_AN` bei jedem neuen Wunsch
+2. `POST /api/wuensche/{id}/stand` mit `{"stand": "…", "text": "…"}`
+3. Datei in den Eingang legen oder `POST /api/eingang` mit `{"pfad": "…", "wunsch": id}`
 
 ## Ohrregal
 
