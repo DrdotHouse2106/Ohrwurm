@@ -60,8 +60,8 @@ class Anschluesse:
     def regelmaessig(self, minuten: int = 15):
         while True:
             time.sleep(minuten * 60)
-            offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
-            for m in self.module:
+            for m in self.module:   # Liste je Anschluss neu holen: was der vorige übernommen hat, ist nicht mehr offen
+                offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
                 if hasattr(m, "regelmaessig") and offen:
                     self._aufruf(m, "regelmaessig", offen)
 

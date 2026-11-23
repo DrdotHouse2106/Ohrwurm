@@ -45,7 +45,7 @@ def regelmaessig(offene_wuensche, ohrwurm):
     """Wird alle 15 Minuten mit allen offenen Wünschen aufgerufen (z. B. für Wiederholungen)."""
 ```
 
-Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert.
+Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert. Die Reihenfolge ergibt sich aus den Dateinamen. „regelmaessig“ bekommt je Anschluss die aktuelle Liste, was ein vorheriger Anschluss übernommen hat (`in_arbeit`), fehlt darin. Vorlagen liegen in `anschluesse/` (Prowlarr/SABnzbd, YouTube als Notlösung).
 
 **Von außen** geht es genauso über HTTP:
 
