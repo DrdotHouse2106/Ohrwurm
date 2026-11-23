@@ -45,7 +45,7 @@ def regelmaessig(offene_wuensche, ohrwurm):
     """Wird alle 15 Minuten mit allen offenen Wünschen aufgerufen (z. B. für Wiederholungen)."""
 ```
 
-Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert. Die Reihenfolge ergibt sich aus den Dateinamen. „regelmaessig“ bekommt je Anschluss die aktuelle Liste, was ein vorheriger Anschluss übernommen hat (`in_arbeit`), fehlt darin. Vorlagen liegen in `anschluesse/` (Prowlarr/SABnzbd, YouTube als Notlösung).
+Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert. Die Reihenfolge ergibt sich aus den Dateinamen. „regelmaessig“ bekommt je Anschluss die aktuelle Liste, was ein vorheriger Anschluss übernommen hat (`in_arbeit`), fehlt darin. Wünsche, die 24 h ohne Ergebnis `in_arbeit` stehen, gehen zurück auf `offen`. Vorlagen liegen in `anschluesse/` (Prowlarr/SABnzbd, YouTube als Notlösung).
 
 **Von außen** geht es genauso über HTTP:
 
@@ -59,7 +59,7 @@ Ohrregal bekommt eine Künstlerseite im Apple-Stil (Alben, Singles & EPs, Zusamm
 
 ## Betrieb
 
-- Docker-Image aus diesem Repo, Daten in `/daten` (SQLite).
+- Läuft auf media-stack als systemd-Dienst `ohrwurm.service` (Einstellungen per Drop-in, `systemctl edit ohrwurm`). Das Docker-Image aus diesem Repo ist die Alternative. Daten in `/daten` (SQLite).
 - Einstellungen über Umgebungsvariablen: `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_SCHLUESSEL` (Pfad zur .p8-Datei, als Datei eingebunden, nie im Repo), `MUSIK` (Musikordner, nur lesen bis auf Ablage), `EINGANG`, `OHRWURM_MELDEN_AN` (optional), `ZUGANG` (Schlüssel für die Schnittstelle).
 - Developer-Token: ES256-JWT, alle 30 Tage neu erzeugt. Bei 401 einmal neu erzeugen und wiederholen.
 - Lidarr kann parallel weiterlaufen. Ohrwurm schreibt nur in Eingang und Ablage.

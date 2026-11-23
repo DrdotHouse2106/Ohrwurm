@@ -89,6 +89,13 @@ class Test(unittest.TestCase):
         self.assertEqual(w["anschluss"], "Probe")
         self.assertTrue(w["pfad"].endswith("01 Bad.flac"))
 
+    def test_haengt(self):
+        w = self.wunsch()
+        self.s.stand(w["id"], "in_arbeit", anschluss="Probe")
+        self.s.db.execute("UPDATE wunsch SET geaendert = 0"); self.s.db.commit()
+        anschluesse.Anschluesse(self.s, None).runde()
+        self.assertEqual(self.s.wunsch(w["id"])["stand"], "offen")
+
 
 if __name__ == "__main__":
     unittest.main()

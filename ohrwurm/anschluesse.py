@@ -60,10 +60,17 @@ class Anschluesse:
     def regelmaessig(self, minuten: int = 15):
         while True:
             time.sleep(minuten * 60)
-            for m in self.module:   # Liste je Anschluss neu holen: was der vorige übernommen hat, ist nicht mehr offen
-                offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
-                if hasattr(m, "regelmaessig") and offen:
-                    self._aufruf(m, "regelmaessig", offen)
+            self.runde()
+
+    def runde(self, haengt_stunden: float = 24):
+        """Hängende Wünsche wieder freigeben, dann alle Anschlüsse mit den offenen Wünschen aufrufen."""
+        for w in self.s.wuensche("in_arbeit"):   # z. B. Download abgebrochen: der nächste Anschluss soll es versuchen
+            if time.time() - (w["geaendert"] or 0) > haengt_stunden * 3600:
+                self.s.stand(w["id"], "offen", f"Seit {haengt_stunden:g} h ohne Ergebnis bei {w['anschluss']}")
+        for m in self.module:   # Liste je Anschluss neu holen: was der vorige übernommen hat, ist nicht mehr offen
+            offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
+            if hasattr(m, "regelmaessig") and offen:
+                self._aufruf(m, "regelmaessig", offen)
 
     def melden(self, wuensche: list[dict]):
         def senden():
