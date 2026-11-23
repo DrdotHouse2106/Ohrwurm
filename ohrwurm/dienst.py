@@ -40,7 +40,7 @@ def kuenstler_json(s, kid: str) -> dict:
                            for v, t in abgleich.ART.items() if ansichten.get(v)]}
 
 
-def starten(s, port: int, zugang: str):
+def starten(s, port: int, zugang: str, adresse: str = "127.0.0.1"):
     class Anfrage(BaseHTTPRequestHandler):
         def antwort(self, code: int, j):
             text = json.dumps(j, ensure_ascii=False).encode()
@@ -88,5 +88,5 @@ def starten(s, port: int, zugang: str):
         def do_DELETE(self): self.bearbeiten("DELETE")
         def log_message(self, *a): pass
 
-    print(f"Ohrwurm hört auf Port {port}", flush=True)
-    ThreadingHTTPServer(("", port), Anfrage).serve_forever()
+    print(f"Ohrwurm hört auf {adresse}:{port}", flush=True)
+    ThreadingHTTPServer((adresse, port), Anfrage).serve_forever()

@@ -1,5 +1,5 @@
 """Kern: Abgleich, Wunschliste und Einsortieren. Alle Zugriffe auf die Datenbank laufen unter einer Sperre."""
-import json, os, sqlite3, threading, time, urllib.parse
+import json, os, re, sqlite3, threading, time, urllib.parse
 from . import abgleich, apple, bestand, eingang
 
 STAENDE = ("offen", "in_arbeit", "fehlgeschlagen", "erledigt")
@@ -11,6 +11,7 @@ class Sammlung:
         self.db = sqlite3.connect(os.path.join(daten, "ohrwurm.db"), check_same_thread=False)
         self.sperre = threading.RLock()
         self.musik, self.ablage, self.eingang = musik, ablage or musik[0], eingang_ordner
+        self.ersetzen = os.environ.get("ERSETZEN", "aus").lower() in ("an", "ja", "1", "true")
         self.katalog = apple.Katalog(self.db, land)
         self.bei_neuem_wunsch = []   # Rückrufe (Anschlüsse, Meldung nach außen)
         bestand.vorbereiten(self.db)
@@ -157,14 +158,26 @@ class Sammlung:
         with self.sperre:
             neben = os.path.join(self.eingang or os.path.dirname(pfad), "")
             t = bestand.lies(pfad)
+            if not t.get("titel"):   # ohne Tags: …/Künstler/Album/01 - Titel.flac
+                teile = os.path.normpath(pfad).split(os.sep)
+                t["titel"] = re.sub(r"^\s*\d+\s*[-._ ]\s*", "", os.path.splitext(teile[-1])[0]).replace("_", " ").strip()
+                if not t.get("kuenstler") and len(teile) >= 3 and not os.path.normpath(teile[-3]) == os.path.normpath(self.eingang or ""):
+                    t["kuenstler"] = teile[-3]
             w = self.wunsch(wunsch_id) if wunsch_id else None
             info = w or self.erkennen(t)
             if not info:
                 eingang.beiseite(pfad, neben + "_unklar")
+                print(f"Nicht erkannt: {pfad} → _unklar", flush=True)
                 return None
             alt = self.vorhanden(info)
             if alt and max(eingang.qualitaet(d) for d in alt) >= eingang.qualitaet(t):
                 eingang.beiseite(pfad, neben + "_doppelt")
+                print(f"Schon vorhanden: {alt[0]['pfad']} ({pfad} → _doppelt)", flush=True)
+                self._erledigt(info, w, alt[0]["pfad"])
+                return None
+            if alt and not self.ersetzen:   # Aus der Sammlung wird nichts entfernt: bessere Fassung nur melden.
+                eingang.beiseite(pfad, neben + "_besser")
+                print(f"Bessere Fassung von {alt[0]['pfad']}: {pfad} → _besser (ERSETZEN ist aus)", flush=True)
                 self._erledigt(info, w, alt[0]["pfad"])
                 return None
             ziel = eingang.ziel_pfad(self.ablage, info, os.path.splitext(pfad)[1].lower())

@@ -4,11 +4,13 @@ services:
     image: ghcr.io/drdothouse2106/ohrwurm:latest
     command: dienst
     restart: unless-stopped
-    ports: ["8095:8095"]
+    ports: ["${LAN_ADRESSE:-127.0.0.1}:8095:8095"]   # nur lokal bzw. im LAN
     environment:
       APPLE_TEAM_ID: ${APPLE_TEAM_ID}
       APPLE_KEY_ID: ${APPLE_KEY_ID}
       APPLE_SCHLUESSEL: /schluessel.p8
+      BIND_ADDR: 0.0.0.0                # im Container; nach außen begrenzt „ports“
+      ERSETZEN: ${ERSETZEN:-aus}
       ZUGANG: ${ZUGANG}                 # Schlüssel für die Schnittstelle (Ohrregal, Anschlüsse)
       MUSIK: /musik
       EINGANG: /eingang

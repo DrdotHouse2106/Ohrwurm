@@ -18,6 +18,7 @@ class Test(unittest.TestCase):
         t = self.tmp.name
         self.musik, self.eingang = os.path.join(t, "musik"), os.path.join(t, "eingang")
         os.makedirs(self.musik); os.makedirs(self.eingang)
+        os.environ["ERSETZEN"] = "an"
         self.s = Sammlung(os.path.join(t, "daten"), [self.musik], eingang_ordner=self.eingang)
 
     def tearDown(self):
@@ -48,6 +49,25 @@ class Test(unittest.TestCase):
         self.assertTrue(ziel2.endswith("01 Bad.flac"))
         self.assertFalse(os.path.exists(ziel))
         self.assertTrue(os.path.exists(os.path.join(self.eingang, "_doppelt", "01 Bad.mp3")))
+
+    def test_ersetzen_aus(self):
+        self.s.ersetzen = False
+        w = self.wunsch()
+        mp3 = os.path.join(self.eingang, "x.mp3"); ton(mp3)
+        ziel = self.s.einsortieren(mp3, w["id"])
+        self.s.heimat = lambda isrc: dict(INFO)
+        flac = os.path.join(self.eingang, "z.flac"); ton(flac, ISRC="USSM18700382")
+        self.assertIsNone(self.s.einsortieren(flac))
+        self.assertTrue(os.path.exists(ziel))
+        self.assertTrue(os.path.exists(os.path.join(self.eingang, "_besser", "z.flac")))
+
+    def test_ohne_tags_dateiname(self):
+        gesehen = {}
+        self.s.erkennen = lambda t: gesehen.update(t) or None
+        ordner = os.path.join(self.eingang, "N4C", "New Times"); os.makedirs(ordner)
+        p = os.path.join(ordner, "01 - New Times.flac"); ton(p)
+        self.s.einsortieren(p)
+        self.assertEqual((gesehen["titel"], gesehen["kuenstler"]), ("New Times", "N4C"))
 
     def test_unklar(self):
         self.s.erkennen = lambda t: None

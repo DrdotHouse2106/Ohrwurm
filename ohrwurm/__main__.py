@@ -49,7 +49,7 @@ def main():
         if s.eingang:
             os.makedirs(s.eingang, exist_ok=True)
             threading.Thread(target=dienst.eingang_ueberwachen, args=(s,), daemon=True).start()
-        dienst.starten(s, int(os.environ.get("PORT", "8095")), zugang)
+        dienst.starten(s, int(os.environ.get("PORT", "8095")), zugang, os.environ.get("BIND_ADDR", "127.0.0.1"))
 
 
 if __name__ == "__main__":

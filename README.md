@@ -27,11 +27,19 @@ Mit Docker: `docker compose run --rm ohrwurm bericht 32940` (Vorlage: [docker-co
 | `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`) |
 | `OHRWURM_MELDEN_AN` | Optional: Adresse, an die jeder neue Wunsch gemeldet wird |
 | `ZUGANG` | Schlüssel für die Schnittstelle (`Authorization: Bearer …`) |
+| `ERSETZEN` | `aus` (Vorgabe): Aus der Sammlung wird nie etwas entfernt; eine bessere Fassung landet in `_besser` und wird nur gemeldet. `an`: Die bessere ersetzt die schlechtere, die schlechtere geht nach `_doppelt`. |
+| `BIND_ADDR` | Adresse, auf der die Schnittstelle lauscht (Vorgabe `127.0.0.1`, im Heimnetz die LAN-Adresse; nie öffentlich) |
 | `DATEN`, `LAND`, `PORT` | Datenordner, Katalogland (`de`), Port (`8095`) |
 
 ## Einsortieren
 
-Erkennung über den ISRC-Tag, sonst über Künstler + Titel + Dauer im Apple-Katalog. Ton wird nicht neu kodiert; die Tags werden komplett aus Apple-Daten neu gesetzt (mit Cover). Ablage: `Albumkünstler/Album (Jahr)/NN Titel.ext`, bei mehreren CDs `2-01 Titel`. Ist das Lied schon in gleicher oder besserer Qualität da, geht die neue Datei nach `_doppelt`. Ist die neue besser (FLAC > ALAC > AAC > MP3), ersetzt sie die alte; die alte geht nach `_doppelt` (wird nicht gelöscht).
+Erkennung über den ISRC-Tag, sonst über Künstler + Titel + Dauer im Apple-Katalog. Ton wird nicht neu kodiert; die Tags werden komplett aus Apple-Daten neu gesetzt (mit Cover). Ablage: `Albumkünstler/Album (Jahr)/NN Titel.ext`, bei mehreren CDs `2-01 Titel`. Ist das Lied schon in gleicher oder besserer Qualität da, geht die neue Datei nach `_doppelt`. Ist die neue besser (FLAC > ALAC > AAC > MP3), kommt sie nach `_besser`. Nur mit `ERSETZEN=an` ersetzt sie die alte; die alte geht dann nach `_doppelt` (wird nicht gelöscht). Ohne Tags versucht Ohrwurm es über den Pfad `…/Künstler/Album/01 - Titel.ext`.
+
+## Sicherheit
+
+- Anschlüsse sind Python-Code und laufen mit den Rechten des Dienstes. Den Ordner `ANSCHLUESSE` darf nur root bzw. der Dienstbenutzer beschreiben (z. B. `chown root:root`, `chmod 755`, Dateien `644`).
+- Die Schnittstelle nur lokal oder im LAN anbieten (`BIND_ADDR`), nie ins Internet freigeben. `ZUGANG` lang und zufällig wählen (`openssl rand -hex 24`).
+- Der MusicKit-Schlüssel wird nur als Datei eingebunden und nur an `api.music.apple.com` geschickt.
 
 ## Schnittstelle
 
