@@ -27,12 +27,27 @@ Mit Docker: `docker compose run --rm ohrwurm bericht 32940` (Vorlage: [docker-co
 | `ABLAGE` | Wohin Neues kommt (Vorgabe: erster Musikordner) |
 | `EINGANG` | Überwachter Eingangsordner. Unklares landet in `_unklar`, Doppeltes in `_doppelt` |
 | `ANSCHLUESSE` | Ordner mit eigenen Anschlüssen (`*.py`) |
-| `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`), in `docker-compose.yml` unter `environment` eintragen |
+| `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`), unter systemd per `EnvironmentFile`, bei Docker in `docker-compose.yml` unter `environment` |
 | `OHRWURM_MELDEN_AN` | Optional: Adresse, an die jeder neue Wunsch gemeldet wird |
 | `ZUGANG` | Schlüssel für die Schnittstelle (`Authorization: Bearer …`) |
 | `ERSETZEN` | `aus` (Vorgabe): Aus der Sammlung wird nie etwas entfernt; eine bessere Fassung landet in `_besser` und wird nur gemeldet. `an`: Die bessere ersetzt die schlechtere, die schlechtere geht nach `_doppelt`. |
 | `BIND_ADDR` | Adresse, auf der die Schnittstelle lauscht (Vorgabe `127.0.0.1`, im Heimnetz die LAN-Adresse; nie öffentlich) |
 | `DATEN`, `LAND`, `PORT` | Datenordner, Katalogland (`de`), Port (`8095`) |
+
+## Betrieb als systemd-Dienst
+
+Einstellungen per Drop-in (`systemctl edit ohrwurm`), Schlüssel in einer eigenen Datei (`root:root`, `600`):
+
+```ini
+[Service]
+Environment=ANSCHLUESSE=/opt/ohrwurm/anschluesse
+EnvironmentFile=/etc/ohrwurm/anschluesse.env
+UMask=0002
+```
+
+Ohne `ANSCHLUESSE` wird kein Anschluss geladen. `UMask=0002` sorgt dafür, dass neue Ordner und Dateien in der Sammlung für alle lesbar sind (wie die bestehenden). Danach `systemctl daemon-reload && systemctl restart ohrwurm`, im Log (`journalctl -u ohrwurm`) steht je Anschluss „… geladen“.
+
+Beiwerk aus Downloads (nfo, jpg, m3u, sfv, txt) räumt SABnzbd über die Bereinigungsliste weg; leere Unterordner im Eingang entfernt Ohrwurm selbst.
 
 ## Einsortieren
 

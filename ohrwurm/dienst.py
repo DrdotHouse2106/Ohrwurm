@@ -85,6 +85,8 @@ def starten(s, port: int, zugang: str, adresse: str = "127.0.0.1"):
                 if methode == "GET" and pfad == "/api/wuensche":
                     return self.antwort(200, s.wuensche(werte.get("stand") or werte.get("status")))
                 if methode == "POST" and pfad == "/api/wuensche":
+                    if not str(koerper.get("apple_id") or "").strip():
+                        raise ValueError("apple_id fehlt")
                     return self.antwort(200, s.wuenschen(koerper["art"], str(koerper["apple_id"])))
                 if methode == "DELETE" and (m := re.fullmatch(r"/api/wuensche/(\d+)", pfad)):
                     s.loeschen(int(m[1])); return self.antwort(200, {"status": "ok"})

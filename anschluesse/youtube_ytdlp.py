@@ -2,7 +2,7 @@
 
 Läuft nur in „regelmaessig“, damit bessere Quellen (z. B. Prowlarr) zuerst zum Zug kommen.
 Einstellungen: ANSCHLUSS_YOUTUBE_WARTEN (Stunden, Vorgabe 6), ANSCHLUSS_YTDLP (Pfad zu yt-dlp, Vorgabe „yt-dlp“).
-Braucht yt-dlp und ffmpeg. Tags und Cover schreibt Ohrwurm beim Einsortieren selbst.
+Braucht yt-dlp, ffmpeg und für YouTube eine JavaScript-Laufzeit (deno), sonst scheitern viele Downloads. Tags und Cover schreibt Ohrwurm beim Einsortieren selbst.
 """
 import os
 import subprocess

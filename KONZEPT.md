@@ -39,6 +39,8 @@ def neuer_wunsch(wunsch, ohrwurm):
     ohrwurm.stand(wunsch["id"], "in_arbeit" | "fehlgeschlagen", text="…")
     ohrwurm.abliefern(pfad, wunsch["id"])   # Datei einsortieren, sicher zugeordnet
     ohrwurm.einstellung("SCHLUESSEL")       # liest Umgebungsvariable ANSCHLUSS_SCHLUESSEL
+    ohrwurm.wunsch(id)                      # aktueller Stand eines Wunsches
+    ohrwurm.protokoll("…")                  # Zeile ins Log
     """
 
 def regelmaessig(offene_wuensche, ohrwurm):

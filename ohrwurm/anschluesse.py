@@ -10,6 +10,10 @@ class Schnittstelle:
     def stand(self, wunsch_id: int, stand: str, text: str = ""):
         self._s.stand(wunsch_id, stand, text, anschluss=self.name)
 
+    def wunsch(self, wunsch_id: int) -> dict | None:
+        """Aktueller Stand eines Wunsches (z. B. um zu prüfen, ob er noch beim eigenen Anschluss liegt)."""
+        return self._s.wunsch(wunsch_id)
+
     def abliefern(self, pfad: str, wunsch_id: int | None = None) -> str | None:
         """Datei einsortieren. Gibt den Pfad in der Sammlung zurück (None: unklar oder schon vorhanden)."""
         return self._s.einsortieren(pfad, wunsch_id)
