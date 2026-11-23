@@ -2,23 +2,48 @@
 
 Verwaltet eine private Musiksammlung mit dem Katalog von Apple Music als Vorlage: Künstlerseiten wie bei Apple Music, Wunschliste auf Liedebene, jedes Lied nur einmal, Einsortieren neuer Dateien. Anschlüsse lassen sich einbinden (siehe [KONZEPT.md](KONZEPT.md)).
 
-## Stand: Schritt 1 – Katalog und Abgleich (nur lesen)
+## Befehle
 
-Ohrwurm schreibt nur in seinen Datenordner, an der Musik ändert es nichts.
+| Befehl | Was passiert |
+|---|---|
+| `dienst` | Schnittstelle (Port 8095), Eingangsordner und Anschlüsse laufen dauerhaft |
+| `einlesen` | Musikordner einlesen (beim ersten Mal dauert es, danach nur Änderungen) |
+| `suche "N4C"` | Apple-ID eines Künstlers finden |
+| `bericht 32940 [--datei x.md]` | Abgleich: was es gibt, was da ist, was fehlt, was doppelt ist |
+| `wuenschen lied\|album\|kuenstler ID` | Wünsche anlegen (nur Lieder, die noch fehlen) |
+| `einsortieren PFAD` | Eine Datei erkennen, taggen und ablegen |
 
-```sh
-docker run --rm \
-  -e APPLE_TEAM_ID=… -e APPLE_KEY_ID=… -e APPLE_SCHLUESSEL=/schluessel.p8 \
-  -v /pfad/zum/AuthKey.p8:/schluessel.p8:ro \
-  -v /pfad/zur/musik:/musik:ro -v ohrwurm-daten:/daten \
-  ghcr.io/drdothouse2106/ohrwurm einlesen          # Bestand einlesen (erstes Mal dauert)
+Mit Docker: `docker compose run --rm ohrwurm bericht 32940` (Vorlage: [docker-compose.yml](docker-compose.yml)). Ohne Docker: `python3 -m ohrwurm …`, dazu `ffmpeg`/`ffprobe` und `openssl`.
 
-… ghcr.io/drdothouse2106/ohrwurm suche "N4C"       # Apple-ID finden
-… ghcr.io/drdothouse2106/ohrwurm bericht 32940 --datei /daten/michael-jackson.md
-```
+## Einstellungen
 
-Ohne Docker: `python3 -m ohrwurm …` mit denselben Umgebungsvariablen (`MUSIK`, `DATEN`, `LAND`), dazu `ffprobe` und `openssl`.
+| Variable | Bedeutung |
+|---|---|
+| `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_SCHLUESSEL` | MusicKit-Schlüssel (Pfad zur .p8-Datei, nur als Datei einbinden) |
+| `MUSIK` | Musikordner, mehrere mit `:` getrennt |
+| `ABLAGE` | Wohin Neues kommt (Vorgabe: erster Musikordner) |
+| `EINGANG` | Überwachter Eingangsordner. Unklares landet in `_unklar`, Doppeltes in `_doppelt` |
+| `ANSCHLUESSE` | Ordner mit eigenen Anschlüssen (`*.py`) |
+| `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`) |
+| `OHRWURM_MELDEN_AN` | Optional: Adresse, an die jeder neue Wunsch gemeldet wird |
+| `ZUGANG` | Schlüssel für die Schnittstelle (`Authorization: Bearer …`) |
+| `DATEN`, `LAND`, `PORT` | Datenordner, Katalogland (`de`), Port (`8095`) |
 
-Der Bericht zeigt je Künstler die Veröffentlichungen nach Art, welche Lieder vorhanden sind (✓) und fehlen (✗), doppelte Dateien (welche behalten wird) und Dateien, die keinem Lied zugeordnet werden konnten.
+## Einsortieren
 
-Mehrere Musikordner: `MUSIK=/musik/flac:/musik/mp3`.
+Erkennung über den ISRC-Tag, sonst über Künstler + Titel + Dauer im Apple-Katalog. Ton wird nicht neu kodiert; die Tags werden komplett aus Apple-Daten neu gesetzt (mit Cover). Ablage: `Albumkünstler/Album (Jahr)/NN Titel.ext`, bei mehreren CDs `2-01 Titel`. Ist das Lied schon in gleicher oder besserer Qualität da, geht die neue Datei nach `_doppelt`. Ist die neue besser (FLAC > ALAC > AAC > MP3), ersetzt sie die alte; die alte geht nach `_doppelt` (wird nicht gelöscht).
+
+## Schnittstelle
+
+Alle Aufrufe mit `Authorization: Bearer <ZUGANG>`.
+
+| Aufruf | |
+|---|---|
+| `GET /api/status` | Anzahl Wünsche je Stand |
+| `GET /api/suche?name=…` | Künstler suchen |
+| `GET /api/kuenstler/{id}` | Künstlerseite mit Abschnitten, Veröffentlichungen, Liedern (vorhanden, Wunsch) |
+| `GET /api/wuensche?stand=offen` | Wünsche (offen, in_arbeit, fehlgeschlagen, erledigt) |
+| `POST /api/wuensche` | `{"art": "lied"\|"album"\|"kuenstler", "apple_id": "…"}` |
+| `DELETE /api/wuensche/{id}` | Wunsch entfernen |
+| `POST /api/wuensche/{id}/stand` | `{"stand": "…", "text": "…"}` |
+| `POST /api/eingang` | `{"pfad": "…", "wunsch": id}` – Datei sofort einsortieren |

@@ -26,6 +26,7 @@ class Lied:
     dauer: float
     heimat: dict              # Veröffentlichung (Apple-Album)
     art: str
+    roh: dict = field(default_factory=dict)   # Apple-Titel (id, attributes)
     auch_auf: list = field(default_factory=list)
     dateien: list = field(default_factory=list)
 
@@ -43,7 +44,7 @@ def lieder_sammeln(veroeffentlichungen: list[tuple[str, dict, list[dict]]]) -> l
             if schluessel in lieder:
                 lieder[schluessel].auch_auf.append(album)
             elif ansicht in HEIMAT:
-                lieder[schluessel] = Lied(a.get("isrc"), a["name"], a.get("artistName", ""), a.get("durationInMillis", 0) / 1000, album, ansicht)
+                lieder[schluessel] = Lied(a.get("isrc"), a["name"], a.get("artistName", ""), a.get("durationInMillis", 0) / 1000, album, ansicht, t)
     return list(lieder.values())
 
 

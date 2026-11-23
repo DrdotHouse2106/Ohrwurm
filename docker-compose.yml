@@ -1,0 +1,22 @@
+# Vorlage. Pfade und Werte in einer .env-Datei neben dieser Datei setzen (nie ins Repo).
+services:
+  ohrwurm:
+    image: ghcr.io/drdothouse2106/ohrwurm:latest
+    command: dienst
+    restart: unless-stopped
+    ports: ["8095:8095"]
+    environment:
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID}
+      APPLE_KEY_ID: ${APPLE_KEY_ID}
+      APPLE_SCHLUESSEL: /schluessel.p8
+      ZUGANG: ${ZUGANG}                 # Schlüssel für die Schnittstelle (Ohrregal, Anschlüsse)
+      MUSIK: /musik
+      EINGANG: /eingang
+      ANSCHLUESSE: /anschluesse
+      # OHRWURM_MELDEN_AN: http://…    # optional: jeder neue Wunsch wird dorthin gemeldet
+    volumes:
+      - ${SCHLUESSEL_DATEI}:/schluessel.p8:ro
+      - ${MUSIK_ORDNER}:/musik           # schreibend: Ablage neuer Dateien
+      - ${EINGANG_ORDNER}:/eingang
+      - ${ANSCHLUESSE_ORDNER}:/anschluesse:ro
+      - ${DATEN_ORDNER}:/daten
