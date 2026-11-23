@@ -10,9 +10,12 @@ import re
 import urllib.parse
 import urllib.request
 
+from ohrwurm.abgleich import einfach
+
 NAME = "Prowlarr (SABnzbd)"
 KATEGORIEN = [3000, 3010, 3040]   # Audio, MP3, Lossless: manche Indexer liefern nur mit Unterkategorie
 _BEREITS_UEBERGEBEN = set()
+UNERWUENSCHT = {"remix", "remixes", "drumless", "instrumental", "instrumentals", "karaoke", "acapella", "tribute", "lullaby", "live", "cover", "covers"}
 _ALBEN = {}   # album_id → (Titel der Übergabe, wartende Wunsch-IDs)
 
 
@@ -32,10 +35,21 @@ def _sab(e, **werte):
     return _hole(f"{e['SABNZBD_URL'].rstrip('/')}/api?" + urllib.parse.urlencode({**werte, "apikey": e["SABNZBD_KEY"], "output": "json"}))
 
 
-def _suche_prowlarr(query, e):
-    params = urllib.parse.urlencode({"query": query, "categories": KATEGORIEN, "type": "search"}, doseq=True)
+def _hauptkuenstler(name):
+    """„Daft Punk feat. Pharrell Williams“ → „Daft Punk“ („Simon & Garfunkel“ bleibt)."""
+    return re.split(r"\s+(?:feat\.?|ft\.?|with)\s+", name or "", flags=re.I)[0]
+
+
+def _suche_prowlarr(kuenstler, name, wunsch, e):
+    """Nur Usenet-Treffer, deren Titel Künstler und Album bzw. Lied enthält, ohne Remixe und Sonderausgaben."""
+    params = urllib.parse.urlencode({"query": f"{kuenstler} {name}", "categories": KATEGORIEN, "type": "search"}, doseq=True)
     treffer = _hole(f"{e['PROWLARR_URL'].rstrip('/')}/api/v1/search?{params}", {"X-Api-Key": e["PROWLARR_KEY"]})
-    return [t for t in treffer if t.get("protocol") == "usenet" and t.get("downloadUrl")]
+    erlaubt = set(re.split(r"[^a-z0-9]+", f"{wunsch.get('titel')} {wunsch.get('album')}".lower()))
+    def passt(t):
+        woerter = re.split(r"[^a-z0-9]+", (t.get("title") or "").lower())
+        flach = "".join(woerter)
+        return einfach(kuenstler) in flach and einfach(name) in flach and not (UNERWUENSCHT & set(woerter)) - erlaubt
+    return [t for t in treffer if t.get("protocol") == "usenet" and t.get("downloadUrl") and passt(t)]
 
 
 def _bewertung(t):
@@ -57,12 +71,13 @@ def _verarbeite_wunsch(wunsch, ohrwurm, e):
         ohrwurm.stand(wid, "in_arbeit", text=f"Kommt mit dem Album: {titel}")
         return
 
-    suchen = ([f"{wunsch['kuenstler']} {wunsch['album']}"] if wunsch.get("album") else []) + [f"{wunsch['kuenstler']} {wunsch['titel']}"]
-    for i, query in enumerate(suchen):
-        if ergebnisse := _suche_prowlarr(query, e):
+    kuenstler = _hauptkuenstler(wunsch["kuenstler"])
+    suchen = ([(wunsch.get("albumkuenstler") or kuenstler, wunsch["album"])] if wunsch.get("album") else []) + [(kuenstler, wunsch["titel"])]
+    for i, (k, name) in enumerate(suchen):
+        if ergebnisse := _suche_prowlarr(k, name, wunsch, e):
             break
     else:
-        ohrwurm.protokoll(f"Nichts gefunden: {' / '.join(suchen)}")
+        ohrwurm.protokoll(f"Nichts gefunden: {' / '.join(' '.join(x) for x in suchen)}")
         return   # bleibt offen, „regelmaessig“ versucht es wieder
 
     for t in sorted(ergebnisse, key=_bewertung, reverse=True):
