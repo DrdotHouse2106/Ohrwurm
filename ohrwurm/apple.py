@@ -44,6 +44,8 @@ class Katalog:
     def hole(self, pfad: str) -> dict | None:
         """GET mit Zwischenspeicher. 404 (leere Ansicht) → None. 401 bei neuem Schlüssel: neu versuchen."""
         url = pfad if pfad.startswith("http") else BASIS + pfad
+        if not url.startswith(BASIS + "/"):   # Token nie an fremde Hosts
+            raise ValueError(f"Unerwartete Adresse: {url}")
         z = self.db.execute("SELECT zeit, json FROM zwischenspeicher WHERE url=?", (url,)).fetchone()
         if z and time.time() - z[0] < self.gueltig:
             return json.loads(z[1]) if z[1] else None

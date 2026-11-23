@@ -31,10 +31,10 @@ def kuenstler_json(s, kid: str) -> dict:
         at = a["attributes"]
         return {"id": a["id"], "name": at["name"], "jahr": (at.get("releaseDate") or "")[:4], "lieder_gesamt": at.get("trackCount"),
                 "cover": (at.get("artwork") or {}).get("url", "").replace("{w}", "600").replace("{h}", "600"),
-                "lieder": [{"apple_id": l.roh.get("id"), "isrc": l.isrc, "titel": l.titel, "dauer": l.dauer, "vorhanden": bool(l.dateien),
+                "lieder": [{"apple_id": l.roh.get("id"), "isrc": l.isrc, "titel": l.titel, "dauer": l.dauer, "vorhanden": bool(l.dateien), "andere_fassung": bool(l.fassungen) and not l.dateien,
                             "wunsch": gewuenscht.get(l.isrc or l.roh.get("id"))} for l in je_album.get(a["id"], [])] if art in abgleich.HEIMAT else None}
     return {"id": k["id"], "name": k["attributes"]["name"],
-            "zahlen": {"lieder": len(lieder), "vorhanden": sum(1 for l in lieder if l.dateien),
+            "zahlen": {"lieder": len(lieder), "vorhanden": sum(1 for l in lieder if l.dateien), "andere_fassung": sum(1 for l in lieder if l.fassungen and not l.dateien),
                        "doppelt": sum(1 for l in lieder if len(l.dateien) > 1), "nicht_zugeordnet": len(rest)},
             "abschnitte": [{"art": v, "titel": t, "veroeffentlichungen": [album(a, v) for a in sorted(ansichten[v], key=lambda a: a["attributes"].get("releaseDate") or "", reverse=True)]}
                            for v, t in abgleich.ART.items() if ansichten.get(v)]}

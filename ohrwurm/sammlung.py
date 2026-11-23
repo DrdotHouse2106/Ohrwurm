@@ -63,8 +63,16 @@ class Sammlung:
         veroeff = [(v, al, k.lieder(al["id"])) for v in abgleich.HEIMAT + ("compilation-albums", "live-albums") for al in ansichten[v]]
         name = abgleich.einfach(kuenstler["attributes"]["name"])
         lieder = [l for l in abgleich.lieder_sammeln(veroeff) if name in abgleich.einfach(l.kuenstler)]
-        muster = f"%{kuenstler['attributes']['name']}%"
-        rest = abgleich.zuordnen(lieder, self._dateien("kuenstler LIKE ? OR albumkuenstler LIKE ?", (muster, muster)))
+        # Dateien des Künstlers (auch „feat.“, „Nachname, Vorname“) und alle mit passendem ISRC, z. B. auf Samplern.
+        n = kuenstler["attributes"]["name"]
+        muster = [f"%{n}%"] + ([f"%{n.split()[-1]}, {' '.join(n.split()[:-1])}%"] if " " in n else [])
+        bedingung = " OR ".join(["kuenstler LIKE ? OR albumkuenstler LIKE ?"] * len(muster))
+        isrcs = [l.isrc for l in lieder if l.isrc]
+        dateien = {d["pfad"]: d for d in self._dateien(bedingung, tuple(m for m in muster for _ in (0, 1)))}
+        for i in range(0, len(isrcs), 500):
+            teil = isrcs[i:i + 500]
+            dateien.update({d["pfad"]: d for d in self._dateien(f"isrc IN ({','.join('?' * len(teil))})", tuple(teil))})
+        rest = abgleich.zuordnen(lieder, list(dateien.values()))
         return kuenstler, ansichten, lieder, rest
 
     # MARK: Bestand
@@ -111,7 +119,7 @@ class Sammlung:
                 infos = [self.lied_info(t, al) for t in k.lieder(apple_id)]
             elif art == "kuenstler":
                 _, _, lieder, _ = self.kuenstler_abgleich(apple_id)
-                infos = [self.lied_info(l.roh, l.heimat) for l in lieder if not l.dateien]
+                infos = [self.lied_info(l.roh, l.heimat) for l in lieder if not l.dateien and not l.fassungen]
             else:
                 raise ValueError("art muss lied, album oder kuenstler sein")
             offen = {w["isrc"] or w["apple_id"] for w in self.wuensche() if w["stand"] != "fehlgeschlagen"}

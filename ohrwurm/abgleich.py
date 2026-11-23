@@ -29,6 +29,7 @@ class Lied:
     roh: dict = field(default_factory=dict)   # Apple-Titel (id, attributes)
     auch_auf: list = field(default_factory=list)
     dateien: list = field(default_factory=list)
+    fassungen: list = field(default_factory=list)   # gleicher Titel, andere Fassung (Radio-Edit, Remaster …)
 
 
 def lieder_sammeln(veroeffentlichungen: list[tuple[str, dict, list[dict]]]) -> list[Lied]:
@@ -49,7 +50,8 @@ def lieder_sammeln(veroeffentlichungen: list[tuple[str, dict, list[dict]]]) -> l
 
 
 def zuordnen(lieder: list[Lied], dateien: list[dict]) -> list[dict]:
-    """Hängt Dateien an Lieder (ISRC, sonst Titel + Dauer ± 3 s). Gibt nicht zugeordnete Dateien zurück."""
+    """Hängt Dateien an Lieder (ISRC, sonst Titel + Dauer ± 3 s; nur gleicher Titel → andere Fassung).
+    Gibt nicht zugeordnete Dateien zurück."""
     nach_isrc = {l.isrc: l for l in lieder if l.isrc}
     nach_titel: dict[str, list[Lied]] = {}
     for l in lieder:
@@ -60,7 +62,12 @@ def zuordnen(lieder: list[Lied], dateien: list[dict]) -> list[dict]:
         if not l:
             l = next((k for k in nach_titel.get(einfach(d.get("titel")), [])
                       if not d.get("dauer") or not k.dauer or abs(k.dauer - d["dauer"]) <= 3), None)
-        (l.dateien if l else rest).append(d)
+        if l:
+            l.dateien.append(d)
+        elif kandidaten := nach_titel.get(einfach(d.get("titel"))):
+            kandidaten[0].fassungen.append(d)
+        else:
+            rest.append(d)
     for l in lieder:
         l.dateien.sort(key=lambda d: (QUALITAET.get(d.get("format") or "", 0), d.get("bitrate") or 0), reverse=True)
     return rest
@@ -70,8 +77,9 @@ def bericht(kuenstler: dict, ansichten: dict[str, list[dict]], lieder: list[Lied
     name = kuenstler["attributes"]["name"]
     da = sum(1 for l in lieder if l.dateien)
     doppelt = [l for l in lieder if len(l.dateien) > 1]
+    fassung = sum(1 for l in lieder if l.fassungen and not l.dateien)
     z = [f"# {name}", "", f"Apple-ID {kuenstler['id']} · {len(lieder)} Lieder aus Alben und Singles · "
-         f"**{da} vorhanden, {len(lieder) - da} fehlen** · {len(doppelt)} doppelt · {len(rest)} Dateien nicht zugeordnet", ""]
+         f"**{da} vorhanden, {fassung} als andere Fassung, {len(lieder) - da - fassung} fehlen** · {len(doppelt)} doppelt · {len(rest)} Dateien nicht zugeordnet", ""]
     je_album: dict[str, list[Lied]] = {}
     for l in lieder:
         je_album.setdefault(l.heimat["id"], []).append(l)
@@ -87,7 +95,8 @@ def bericht(kuenstler: dict, ansichten: dict[str, list[dict]], lieder: list[Lied
             if ansicht in HEIMAT:
                 n = sum(1 for l in eigene if l.dateien)
                 z.append(f"- **{at['name']}** ({jahr}) – {n}/{len(eigene)} vorhanden" + (f", {at.get('trackCount', 0) - len(eigene)} Lieder schon woanders" if at.get("trackCount", 0) > len(eigene) else ""))
-                z += [f"  - {'✓' if l.dateien else '✗'} {l.titel}" for l in eigene]
+                z += [f"  - {'✓' if l.dateien else '≈' if l.fassungen else '✗'} {l.titel}"
+                      + (f" (andere Fassung: {l.fassungen[0]['pfad']})" if l.fassungen and not l.dateien else "") for l in eigene]
             else:
                 z.append(f"- {at['name']} ({jahr}) – {at.get('trackCount', '?')} Lieder, nur Anzeige")
         z.append("")

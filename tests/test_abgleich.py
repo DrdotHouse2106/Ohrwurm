@@ -40,7 +40,8 @@ class Test(unittest.TestCase):
         bad, sc = l
         self.assertEqual([d["pfad"] for d in bad.dateien], ["b.flac", "a.mp3"])   # FLAC zuerst
         self.assertEqual([d["pfad"] for d in sc.dateien], ["d.flac"])
-        self.assertEqual([d["pfad"] for d in rest], ["c.flac"])                    # Dauer passt nicht
+        self.assertEqual(rest, [])
+        self.assertEqual([d["pfad"] for d in sc.fassungen], ["c.flac"])            # Dauer passt nicht → andere Fassung
 
     def test_der_zu_roh(self):
         r, s = b"\x00" + b"\x81" * 32, b"\x01" * 31
