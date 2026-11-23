@@ -51,9 +51,9 @@ def main():
             print(ziel)
     elif a.befehl == "folgen":
         if a.apple_id:
-            print(s.folgen(a.apple_id, a.automatisch))
+            s.folgen(a.apple_id, a.automatisch)
         for g in s.gefolgt():
-            print(g["apple_id"], g["name"], "(automatisch wünschen)" if g["automatisch"] else "")
+            print(g["apple_id"], g["name"], "– Neuerscheinungen werden automatisch gewünscht" if g["automatisch"] else "– nur Hinweis")
     elif a.befehl == "entfolgen":
         s.entfolgen(a.apple_id)
     elif a.befehl == "neuheiten":
