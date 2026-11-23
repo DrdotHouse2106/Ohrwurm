@@ -13,10 +13,15 @@ def eingang_ueberwachen(s, alle: int = 30, ruhe: int = 60):
                 p = os.path.join(wurzel, d)
                 if os.path.splitext(d)[1].lower() in bestand.ENDUNGEN and time.time() - os.path.getmtime(p) > ruhe:
                     try:
-                        ziel = s.einsortieren(p)
-                        print(f"Eingang: {d} → {ziel or 'beiseite gelegt'}", flush=True)
+                        if ziel := s.einsortieren(p):
+                            print(f"Eingang: {d} → {ziel}", flush=True)
                     except Exception:
                         print(f"Eingang: {d}\n{traceback.format_exc()}", flush=True)
+        # Leer gewordene Unterordner aufräumen (nicht die mit „_“).
+        for wurzel, ordner, dateien in os.walk(s.eingang, topdown=False):
+            if wurzel != s.eingang and not ordner and not dateien and not os.path.basename(wurzel).startswith(("_", ".")):
+                try: os.rmdir(wurzel)
+                except OSError: pass
         time.sleep(alle)
 
 

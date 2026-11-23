@@ -41,7 +41,8 @@ def main():
         for w in s.wuenschen(a.art, a.apple_id):
             print(w["id"], w["kuenstler"], "–", w["titel"], f"({w['album']})")
     elif a.befehl == "einsortieren":
-        print(s.einsortieren(os.path.abspath(a.pfad)) or "beiseite gelegt (unklar oder schon vorhanden)")
+        if ziel := s.einsortieren(os.path.abspath(a.pfad)):
+            print(ziel)
     elif a.befehl == "dienst":
         zugang = os.environ.get("ZUGANG") or sys.exit("ZUGANG fehlt (Schlüssel für die Schnittstelle)")
         a_ = anschluesse.Anschluesse(s, os.environ.get("ANSCHLUESSE"))
