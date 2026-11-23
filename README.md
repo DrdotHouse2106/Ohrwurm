@@ -27,7 +27,7 @@ Mit Docker: `docker compose run --rm ohrwurm bericht 32940` (Vorlage: [docker-co
 | `ABLAGE` | Wohin Neues kommt (Vorgabe: erster Musikordner) |
 | `EINGANG` | Überwachter Eingangsordner. Unklares landet in `_unklar`, Doppeltes in `_doppelt` |
 | `ANSCHLUESSE` | Ordner mit eigenen Anschlüssen (`*.py`) |
-| `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`) |
+| `ANSCHLUSS_…` | Einstellungen für Anschlüsse (`ohrwurm.einstellung("…")`), in `docker-compose.yml` unter `environment` eintragen |
 | `OHRWURM_MELDEN_AN` | Optional: Adresse, an die jeder neue Wunsch gemeldet wird |
 | `ZUGANG` | Schlüssel für die Schnittstelle (`Authorization: Bearer …`) |
 | `ERSETZEN` | `aus` (Vorgabe): Aus der Sammlung wird nie etwas entfernt; eine bessere Fassung landet in `_besser` und wird nur gemeldet. `an`: Die bessere ersetzt die schlechtere, die schlechtere geht nach `_doppelt`. |

@@ -15,6 +15,11 @@ services:
       MUSIK: /musik
       EINGANG: /eingang
       ANSCHLUESSE: /anschluesse
+      # Einstellungen für Anschlüsse müssen hier stehen, sonst kommen sie nicht im Container an:
+      # ANSCHLUSS_PROWLARR_URL: http://prowlarr:9696
+      # ANSCHLUSS_PROWLARR_KEY: ${PROWLARR_KEY}
+      # ANSCHLUSS_SABNZBD_URL: http://sabnzbd:8080
+      # ANSCHLUSS_SABNZBD_KEY: ${SABNZBD_KEY}
       # OHRWURM_MELDEN_AN: http://…    # optional: jeder neue Wunsch wird dorthin gemeldet
     volumes:
       - ${SCHLUESSEL_DATEI}:/schluessel.p8:ro
