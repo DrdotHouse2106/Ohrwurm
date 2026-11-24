@@ -73,7 +73,7 @@ class Anschluesse:
                 self.s.stand(w["id"], "offen", f"Seit {haengt_stunden:g} h ohne Ergebnis bei {w['anschluss']}")
         for m in self.module:   # Liste je Anschluss neu holen: was der vorige übernommen hat, ist nicht mehr offen
             offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
-            if hasattr(m, "regelmaessig") and offen:
+            if hasattr(m, "regelmaessig"):   # auch mit leerer Liste, z. B. um laufende Downloads zu prüfen
                 self._aufruf(m, "regelmaessig", offen)
 
     def melden(self, wuensche: list[dict]):

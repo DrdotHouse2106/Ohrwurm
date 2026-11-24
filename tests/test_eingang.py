@@ -96,6 +96,14 @@ class Test(unittest.TestCase):
         anschluesse.Anschluesse(self.s, None).runde()
         self.assertEqual(self.s.wunsch(w["id"])["stand"], "offen")
 
+    def test_regelmaessig_ohne_offene(self):
+        ordner = os.path.join(self.tmp.name, "anschluesse"); os.makedirs(ordner)
+        with open(os.path.join(ordner, "probe.py"), "w") as f:
+            f.write("NAME = 'Probe'\nAUFRUFE = []\ndef regelmaessig(offen, o):\n    AUFRUFE.append(len(offen))\n")
+        a = anschluesse.Anschluesse(self.s, ordner)
+        a.runde()
+        self.assertEqual(a.module[0].AUFRUFE, [0])
+
 
 if __name__ == "__main__":
     unittest.main()
