@@ -5,6 +5,14 @@ from . import abgleich, apple, bestand, eingang
 STAENDE = ("offen", "in_arbeit", "fehlgeschlagen", "erledigt")
 
 
+FASSUNGEN = {"drumless", "instrumental", "remix", "remixes", "live", "karaoke", "acapella", "acoustic", "demo"}
+
+
+def _flach(t: str | None) -> str:
+    """Albumname zum genauen Vergleich: „(10th Anniversary Edition)“ zählt, anders als bei abgleich.einfach."""
+    return re.sub(r"[^a-z0-9]+", "", (t or "").lower())
+
+
 class Sammlung:
     def __init__(self, daten: str, musik: list[str], ablage: str | None = None, eingang_ordner: str | None = None, land: str = "de"):
         os.makedirs(daten, exist_ok=True)
@@ -35,8 +43,9 @@ class Sammlung:
                 "jahr": (al.get("releaseDate") or "")[:4] or None, "nummer": a.get("trackNumber"), "cd": a.get("discNumber"),
                 "genre": genre, "cover": (al.get("artwork") or {}).get("url", "").replace("{w}", "1000").replace("{h}", "1000") or None}
 
-    def heimat(self, isrc: str) -> dict | None:
-        """Früheste Veröffentlichung (keine Zusammenstellung) mit diesem ISRC."""
+    def heimat(self, isrc: str, album: str | None = None) -> dict | None:
+        """Veröffentlichung mit diesem ISRC: zuerst die mit gleichem Albumnamen wie in der Datei,
+        sonst die früheste (keine Zusammenstellung), bei gleichem Datum die mit dem kürzesten Namen (keine „Edition“)."""
         k = self.katalog
         kandidaten = []
         for t in k.alle(f"/v1/catalog/{k.land}/songs?filter[isrc]={isrc}"):
@@ -44,22 +53,29 @@ class Sammlung:
                 j = k.hole(f"/v1/catalog/{k.land}/albums/{ref['id']}")
                 if j:
                     al = j["data"][0]
-                    kandidaten.append(((al["attributes"].get("isCompilation", False), al["attributes"].get("releaseDate") or "9999"), t, al))
+                    a = al["attributes"]
+                    kandidaten.append(((album is not None and _flach(a["name"]) != _flach(album), a.get("isCompilation", False),
+                                        a.get("releaseDate") or "9999", len(a["name"])), t, al))
         return self.lied_info(*min(kandidaten, key=lambda x: x[0])[1:]) if kandidaten else None
 
     def erkennen(self, t: dict) -> dict | None:
         """Datei-Tags → Katalog-Lied (ISRC, sonst Suche nach Künstler + Titel mit passender Dauer)."""
-        if t.get("isrc") and (h := self.heimat(t["isrc"])):
+        if t.get("isrc") and (h := self.heimat(t["isrc"], t.get("album"))):
             return h
         if not t.get("titel"):
             return None
         k = self.katalog
         j = k.hole(f"/v1/catalog/{k.land}/search?" + urllib.parse.urlencode({"term": f"{t.get('kuenstler') or ''} {t['titel']}", "types": "songs", "limit": 10}))
-        for s in (j or {}).get("results", {}).get("songs", {}).get("data", []):
-            a = s["attributes"]
-            if abgleich.einfach(a["name"]) == abgleich.einfach(t["titel"]) and (not t.get("dauer") or abs(a.get("durationInMillis", 0) / 1000 - t["dauer"]) <= 3):
-                return (a.get("isrc") and self.heimat(a["isrc"])) or None
-        return None
+        passend = [s["attributes"] for s in (j or {}).get("results", {}).get("songs", {}).get("data", [])
+                   if abgleich.einfach(s["attributes"]["name"]) == abgleich.einfach(t["titel"])
+                   and (not t.get("dauer") or abs(s["attributes"].get("durationInMillis", 0) / 1000 - t["dauer"]) <= 3)]
+        # Gleiche Länge heißt nicht gleiche Fassung (z. B. Drumless): Albumname der Datei zuerst, Sonderfassungen zuletzt.
+        erlaubt = set(re.split(r"[^a-z0-9]+", f"{t['titel']} {t.get('album') or ''}".lower()))
+        def rang(a):
+            woerter = set(re.split(r"[^a-z0-9]+", f"{a['name']} {a.get('albumName', '')}".lower()))
+            return (bool(t.get("album")) and _flach(a.get("albumName")) != _flach(t["album"]), bool((FASSUNGEN & woerter) - erlaubt))
+        a = min(passend, key=rang, default=None)
+        return (a and a.get("isrc") and self.heimat(a["isrc"], a.get("albumName"))) or None
 
     def kuenstler_abgleich(self, kid: str):
         k = self.katalog
@@ -241,6 +257,9 @@ class Sammlung:
                     t["kuenstler"] = teile[-3]
             w = self.wunsch(wunsch_id) if wunsch_id else None
             info = w or self.erkennen(t)
+            if not w and info and info.get("isrc"):   # Ein Wunsch legt die Fassung fest (z. B. Original statt Jubiläumsausgabe).
+                z = self.db.execute("SELECT * FROM wunsch WHERE isrc = ? AND stand != 'erledigt' ORDER BY id LIMIT 1", (info["isrc"],)).fetchone()
+                info = self._wunsch(z) if z else info
             if not info:
                 eingang.beiseite(pfad, neben + "_unklar")
                 print(f"Nicht erkannt: {pfad} → _unklar", flush=True)

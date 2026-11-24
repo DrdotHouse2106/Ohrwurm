@@ -99,7 +99,8 @@ def _verlauf_pruefen(ohrwurm, e):
             continue
         gesehen.add(m[1])
         w = ohrwurm.wunsch(int(m[1]))
-        if f.get("status") == "Failed" and w and w["stand"] == "in_arbeit" and w["anschluss"] == NAME:
+        # Nach dem Löschen vergibt Ohrwurm Nummern neu: nur Einträge zählen, die nach dem Wunsch entstanden sind.
+        if f.get("status") == "Failed" and w and w["stand"] == "in_arbeit" and w["anschluss"] == NAME and (f.get("completed") or 0) >= (w.get("erstellt") or 0):
             text = f"SABnzbd: {f.get('fail_message') or 'Download fehlgeschlagen'}"
             for i in [w["id"]] + _ALBEN.pop(w.get("album_id"), (None, []))[1]:
                 if (ohrwurm.wunsch(i) or {}).get("stand") == "in_arbeit":

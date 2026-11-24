@@ -40,7 +40,7 @@ class Test(unittest.TestCase):
         # Gleiche Qualität nochmal → beiseite
         mp3b = os.path.join(self.eingang, "y.mp3"); ton(mp3b, title="Bad", artist="Michael Jackson", TSRC="USSM18700382")
         self.s.katalog.hole = lambda *_: None   # kein Netz
-        self.s.heimat = lambda isrc: dict(INFO)
+        self.s.heimat = lambda isrc, *_: dict(INFO)
         self.assertIsNone(self.s.einsortieren(mp3b))
         self.assertTrue(os.path.exists(os.path.join(self.eingang, "_doppelt", "y.mp3")))
         # FLAC ist besser → ersetzt die MP3, die MP3 geht beiseite
@@ -55,7 +55,7 @@ class Test(unittest.TestCase):
         w = self.wunsch()
         mp3 = os.path.join(self.eingang, "x.mp3"); ton(mp3)
         ziel = self.s.einsortieren(mp3, w["id"])
-        self.s.heimat = lambda isrc: dict(INFO)
+        self.s.heimat = lambda isrc, *_: dict(INFO)
         flac = os.path.join(self.eingang, "z.flac"); ton(flac, ISRC="USSM18700382")
         self.assertIsNone(self.s.einsortieren(flac))
         self.assertTrue(os.path.exists(ziel))
@@ -103,6 +103,23 @@ class Test(unittest.TestCase):
         a = anschluesse.Anschluesse(self.s, ordner)
         a.runde()
         self.assertEqual(a.module[0].AUFRUFE, [0])
+
+    def test_fassung(self):
+        """Original statt Jubiläums- oder Drumless-Ausgabe (Daft Punk, Test 24.11.)."""
+        def album(id, name, datum): return {"id": id, "attributes": {"name": name, "releaseDate": datum, "artistName": "Daft Punk"}}
+        lied = {"id": "s", "attributes": {"name": "Touch", "isrc": "X", "durationInMillis": 498960}, "relationships": {"albums": {"data": [{"id": "2"}, {"id": "1"}]}}}
+        alben = {"1": album("1", "Random Access Memories", "2013-05-17"), "2": album("2", "Random Access Memories (10th Anniversary Edition)", "2013-05-17")}
+        self.s.katalog.alle = lambda pfad, *_: [lied]
+        self.s.katalog.hole = lambda pfad, *_: {"data": [alben[pfad.rsplit("/", 1)[1]]]} if "/albums/" in pfad else None
+        self.assertEqual(self.s.heimat("X")["album"], "Random Access Memories")
+        self.assertEqual(self.s.heimat("X", "Random Access Memories (10th Anniversary Edition)")["album"], "Random Access Memories (10th Anniversary Edition)")
+        songs = [{"attributes": {"name": "Touch", "isrc": i, "durationInMillis": 498960, "albumName": n}}
+                 for i, n in (("D", "Random Access Memories (Drumless Edition)"), ("X", "Random Access Memories"))]
+        self.s.katalog.hole = lambda pfad, *_: {"results": {"songs": {"data": songs}}} if "/search" in pfad else {"data": [alben[pfad.rsplit("/", 1)[1]]]}
+        gefragt = []
+        self.s.heimat = lambda isrc, album=None: gefragt.append(isrc)
+        self.s.erkennen({"titel": "Touch", "kuenstler": "Daft Punk", "dauer": 498.9})
+        self.assertEqual(gefragt, ["X"])
 
 
 if __name__ == "__main__":
