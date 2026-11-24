@@ -41,10 +41,18 @@ def neuer_wunsch(wunsch, ohrwurm):
     ohrwurm.einstellung("SCHLUESSEL")       # liest Umgebungsvariable ANSCHLUSS_SCHLUESSEL
     ohrwurm.wunsch(id)                      # aktueller Stand eines Wunsches
     ohrwurm.protokoll("…")                  # Zeile ins Log
+    ohrwurm.wuensche("erledigt")            # Wünsche je Stand
+    ohrwurm.merken("x", wert) / ohrwurm.erinnern("x", vorgabe)   # eigener Speicher, überlebt Neustarts
     """
 
 def regelmaessig(offene_wuensche, ohrwurm):
     """Wird alle 15 Minuten mit allen offenen Wünschen aufgerufen, auch wenn die Liste leer ist (z. B. für Wiederholungen oder um laufende Downloads zu prüfen)."""
+
+def treffer(wunsch, ohrwurm):
+    """Von-Hand-Suche: Liste von dicts mit kennung, titel, groesse, … (keine Adressen mit Schlüsseln)."""
+
+def nehmen(wunsch, kennung, ohrwurm):
+    """Den von Hand gewählten Treffer laden."""
 ```
 
 Ohrwurm fängt Fehler je Anschluss ab, protokolliert sie und zeigt in Ohrregal, welcher Anschluss welchen Wunsch bearbeitet. Mehrere Anschlüsse sind möglich; sie werden nacheinander gefragt, bis einer liefert. Die Reihenfolge ergibt sich aus den Dateinamen. „regelmaessig“ bekommt je Anschluss die aktuelle Liste, was ein vorheriger Anschluss übernommen hat (`in_arbeit`), fehlt darin. Wünsche, die 24 h ohne Ergebnis `in_arbeit` stehen, gehen zurück auf `offen`. Vorlagen liegen in `anschluesse/` (Prowlarr/SABnzbd, YouTube als Notlösung).

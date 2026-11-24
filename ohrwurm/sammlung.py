@@ -270,7 +270,9 @@ class Sammlung:
                 print(f"Schon vorhanden: {alt[0]['pfad']} ({pfad} → _doppelt)", flush=True)
                 self._erledigt(info, w, alt[0]["pfad"])
                 return None
-            if alt and not self.ersetzen:   # Aus der Sammlung wird nichts entfernt: bessere Fassung nur melden.
+            # Dateien, die Ohrwurm selbst für einen Wunsch abgelegt hat (z. B. von YouTube), dürfen immer verbessert werden.
+            eigene = all(self.db.execute("SELECT 1 FROM wunsch WHERE pfad = ?", (d["pfad"],)).fetchone() for d in alt)
+            if alt and not self.ersetzen and not eigene:   # Aus der Sammlung wird nichts entfernt: bessere Fassung nur melden.
                 eingang.beiseite(pfad, neben + "_besser")
                 print(f"Bessere Fassung von {alt[0]['pfad']}: {pfad} → _besser (ERSETZEN ist aus)", flush=True)
                 self._erledigt(info, w, alt[0]["pfad"])
@@ -282,6 +284,7 @@ class Sammlung:
                 if os.path.exists(d["pfad"]):
                     eingang.beiseite(d["pfad"], neben + "_doppelt")
                 self.db.execute("DELETE FROM bestand WHERE pfad = ?", (d["pfad"],))
+                self.db.execute("UPDATE wunsch SET pfad = ? WHERE pfad = ?", (ziel, d["pfad"]))
             st = os.stat(ziel)
             n = bestand.lies(ziel)
             self.db.execute(f"REPLACE INTO bestand ({bestand.SPALTEN}) VALUES (?,?,?,?,?,?,?,?,?,?,?)",

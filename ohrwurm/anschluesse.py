@@ -14,6 +14,19 @@ class Schnittstelle:
         """Aktueller Stand eines Wunsches (z. B. um zu prüfen, ob er noch beim eigenen Anschluss liegt)."""
         return self._s.wunsch(wunsch_id)
 
+    def wuensche(self, stand: str | None = None) -> list[dict]:
+        return self._s.wuensche(stand)
+
+    def erinnern(self, schluessel: str, vorgabe=None):
+        """Gespeicherten Wert des Anschlusses lesen (überlebt Neustarts)."""
+        z = self._s.db.execute("SELECT wert FROM anschluss_daten WHERE anschluss = ? AND schluessel = ?", (self.name, schluessel)).fetchone()
+        return json.loads(z[0]) if z else vorgabe
+
+    def merken(self, schluessel: str, wert):
+        with self._s.sperre:
+            self._s.db.execute("REPLACE INTO anschluss_daten VALUES (?, ?, ?)", (self.name, schluessel, json.dumps(wert)))
+            self._s.db.commit()
+
     def abliefern(self, pfad: str, wunsch_id: int | None = None) -> str | None:
         """Datei einsortieren. Gibt den Pfad in der Sammlung zurück (None: unklar oder schon vorhanden)."""
         return self._s.einsortieren(pfad, wunsch_id)
@@ -28,6 +41,8 @@ class Schnittstelle:
 class Anschluesse:
     def __init__(self, sammlung, ordner: str | None):
         self.s, self.module = sammlung, []
+        sammlung.anschluesse = self
+        sammlung.db.execute("CREATE TABLE IF NOT EXISTS anschluss_daten (anschluss TEXT, schluessel TEXT, wert TEXT, PRIMARY KEY (anschluss, schluessel))")
         for datei in sorted(glob.glob(os.path.join(ordner, "*.py"))) if ordner else []:
             try:
                 spec = importlib.util.spec_from_file_location("anschluss_" + os.path.basename(datei)[:-3], datei)
@@ -75,6 +90,22 @@ class Anschluesse:
             offen = self.s.wuensche("offen") + self.s.wuensche("fehlgeschlagen")
             if hasattr(m, "regelmaessig"):   # auch mit leerer Liste, z. B. um laufende Downloads zu prüfen
                 self._aufruf(m, "regelmaessig", offen)
+
+    def treffer(self, wunsch_id: int) -> list[dict]:
+        """Von-Hand-Suche: Treffer aller Anschlüsse, die „treffer“ anbieten."""
+        w, ergebnis = self.s.wunsch(wunsch_id) or {}, []
+        for m in self.module:
+            if w and hasattr(m, "treffer"):
+                try:
+                    ergebnis += [{**t, "anschluss": m.NAME} for t in m.treffer(w, Schnittstelle(self.s, m.NAME))]
+                except Exception as f:
+                    print(f"Anschluss „{m.NAME}“ (treffer): {type(f).__name__}: {f}", flush=True)
+        return ergebnis
+
+    def nehmen(self, wunsch_id: int, anschluss: str, kennung: str):
+        """Von Hand gewählten Treffer an den Anschluss geben."""
+        m = next(m for m in self.module if m.NAME == anschluss and hasattr(m, "nehmen"))
+        m.nehmen(self.s.wunsch(wunsch_id), kennung, Schnittstelle(self.s, m.NAME))
 
     def melden(self, wuensche: list[dict]):
         def senden():

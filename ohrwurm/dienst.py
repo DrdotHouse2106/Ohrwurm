@@ -88,6 +88,11 @@ def starten(s, port: int, zugang: str, adresse: str = "127.0.0.1"):
                     if not str(koerper.get("apple_id") or "").strip():
                         raise ValueError("apple_id fehlt")
                     return self.antwort(200, s.wuenschen(koerper["art"], str(koerper["apple_id"])))
+                if (m := re.fullmatch(r"/api/wuensche/(\d+)/treffer", pfad)) and (a := getattr(s, "anschluesse", None)):
+                    if methode == "GET":
+                        return self.antwort(200, a.treffer(int(m[1])))
+                    if methode == "POST":
+                        a.nehmen(int(m[1]), koerper["anschluss"], koerper["kennung"]); return self.antwort(200, {"status": "ok"})
                 if methode == "DELETE" and (m := re.fullmatch(r"/api/wuensche/(\d+)", pfad)):
                     s.loeschen(int(m[1])); return self.antwort(200, {"status": "ok"})
                 if methode == "POST" and (m := re.fullmatch(r"/api/wuensche/(\d+)/stand", pfad)):
@@ -105,7 +110,7 @@ def starten(s, port: int, zugang: str, adresse: str = "127.0.0.1"):
                 if methode == "POST" and pfad == "/api/eingang":
                     return self.antwort(200, {"pfad": s.einsortieren(koerper["pfad"], koerper.get("wunsch"))})
                 return self.antwort(404, {"text": "Unbekannt"})
-            except (KeyError, ValueError) as f:
+            except (KeyError, ValueError, StopIteration) as f:
                 return self.antwort(400, {"text": f"Ungültige Anfrage: {f}"})
             except Exception as f:
                 traceback.print_exc()

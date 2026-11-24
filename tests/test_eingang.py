@@ -51,15 +51,29 @@ class Test(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.eingang, "_doppelt", "01 Bad.mp3")))
 
     def test_ersetzen_aus(self):
+        """Eigene Dateien bleiben, die bessere Fassung kommt nach _besser."""
         self.s.ersetzen = False
-        w = self.wunsch()
-        mp3 = os.path.join(self.eingang, "x.mp3"); ton(mp3)
-        ziel = self.s.einsortieren(mp3, w["id"])
         self.s.heimat = lambda isrc, *_: dict(INFO)
+        mp3 = os.path.join(self.eingang, "x.mp3"); ton(mp3, ISRC="USSM18700382")
+        ziel = self.s.einsortieren(mp3)
         flac = os.path.join(self.eingang, "z.flac"); ton(flac, ISRC="USSM18700382")
         self.assertIsNone(self.s.einsortieren(flac))
         self.assertTrue(os.path.exists(ziel))
         self.assertTrue(os.path.exists(os.path.join(self.eingang, "_besser", "z.flac")))
+
+    def test_ersetzen_aus_wunschdatei(self):
+        """Was Ohrwurm für einen Wunsch abgelegt hat (z. B. von YouTube), wird auch mit ERSETZEN=aus verbessert."""
+        self.s.ersetzen = False
+        w = self.wunsch()
+        mp3 = os.path.join(self.eingang, "x.mp3"); ton(mp3)
+        alt = self.s.einsortieren(mp3, w["id"])
+        self.s.heimat = lambda isrc, *_: dict(INFO)
+        flac = os.path.join(self.eingang, "z.flac"); ton(flac, ISRC="USSM18700382")
+        neu = self.s.einsortieren(flac)
+        self.assertTrue(neu.endswith(".flac"))
+        self.assertFalse(os.path.exists(alt))
+        self.assertTrue(os.path.exists(os.path.join(self.eingang, "_doppelt", os.path.basename(alt))))
+        self.assertEqual(self.s.wunsch(w["id"])["pfad"], neu)
 
     def test_ohne_tags_dateiname(self):
         gesehen = {}
