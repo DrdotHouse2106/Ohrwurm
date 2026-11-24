@@ -78,6 +78,19 @@ class Test(unittest.TestCase):
         self.a.nehmen(3, "Prowlarr (SABnzbd)", treffer[-1]["kennung"])
         self.assertIn("Von Hand", self.s.wunsch(3)["text"])
 
+    def test_fertig_ohne_lied(self):
+        """Album fertig geladen, das Lied war aber nicht dabei: nur für diesen Wunsch sperren, nächsten Treffer laden."""
+        self.m.NACH_FERTIG = 0
+        self.m.neuer_wunsch(self.wunsch(1, "Get Lucky"), self.o)
+        self.verlauf.insert(0, {"name": self.uebergaben[0], "status": "Completed"})
+        self.a.runde()
+        self.assertEqual(self.uebergaben[1:], ["[Ohrwurm-1] " + REL[1]["title"]])
+        self.assertEqual(self.o.erinnern("gesperrt", []), [])   # für andere Lieder bleibt der Treffer nutzbar
+        self.assertEqual(self.o.erinnern("ohne_lied"), {"1": [REL[0]["title"]]})
+        e = self.m._einstellungen(self.o)
+        self.assertEqual(self.m._kandidaten(self.wunsch(2, "Contact"), self.o, e)[0][0]["title"], REL[0]["title"])
+        self.assertNotIn(REL[0]["title"], [t["title"] for t in self.m._kandidaten(self.s.wunsch(1), self.o, e)[0]])
+
     def test_passt_wortfolge(self):
         """Kurze und Zahlen-Namen treffen nur ganze Wörter (Test 24.11.: „21“ traf „2021“)."""
         p = self.m._passt

@@ -26,6 +26,9 @@ UNERWUENSCHT = {"remix", "remixes", "drumless", "instrumental", "instrumentals",
 NEU_SUCHEN = 6 * 3600          # offene Wünsche ohne Treffer
 BESSER_SUCHEN = 7 * 24 * 3600  # erledigte Wünsche ohne FLAC
 BESSER_JE_RUNDE = 5
+NACH_FERTIG = 3600             # so lange nach „Completed“ hat Ohrwurm Zeit zum Einsortieren, dann wird geprüft
+ZWISCHENSPEICHER = 3600        # gleiche Suche nicht öfter als stündlich an die Indexer (viele Wünsche aus einem Album)
+_suchen_cache = {}             # (Künstler, Name) → (Zeit, Treffer)
 _sperre = threading.RLock()
 _von_hand = {}   # kennung → Treffer der letzten Von-Hand-Suche (die Download-Adresse enthält den Prowlarr-Schlüssel)
 
@@ -64,13 +67,17 @@ def _indexer(e):
             and any(audio(k) for k in (i.get("capabilities") or {}).get("categories") or [])]
 
 
-def _prowlarr(kuenstler, name, e):
+def _prowlarr(kuenstler, name, e, frisch=False):
+    if not frisch and (z := _suchen_cache.get((kuenstler, name))) and time.time() - z[0] < ZWISCHENSPEICHER:
+        return z[1]
     werte = {"query": f"{kuenstler} {name}", "categories": KATEGORIEN, "type": "search"}
     if ids := _indexer(e):
         werte["indexerIds"] = ids
     params = urllib.parse.urlencode(werte, doseq=True)
     treffer = _hole(f"{e['PROWLARR_URL'].rstrip('/')}/api/v1/search?{params}", {"X-Api-Key": e["PROWLARR_KEY"]})
-    return [t for t in treffer if t.get("protocol") == "usenet" and t.get("downloadUrl")]
+    ergebnis = [t for t in treffer if t.get("protocol") == "usenet" and t.get("downloadUrl")]
+    _suchen_cache[(kuenstler, name)] = (time.time(), ergebnis)
+    return ergebnis
 
 
 def _woerter(text, klammern=False):
@@ -104,7 +111,8 @@ def _bewertung(t):
 
 def _kandidaten(wunsch, ohrwurm, e, nur_flac=False):
     """Passende Treffer, beste zuerst, ohne gesperrte. Gibt (Treffer, ob es die Albumsuche war) zurück."""
-    gesperrt = set(ohrwurm.erinnern("gesperrt", []))
+    # global gesperrt (Download gescheitert) und je Wunsch (geladen, aber ohne dieses Lied)
+    gesperrt = set(ohrwurm.erinnern("gesperrt", [])) | set(ohrwurm.erinnern("ohne_lied", {}).get(str(wunsch["id"]), []))
     suchen = _suchen(wunsch)
     for i, (k, name) in enumerate(suchen):
         liste = [t for t in _prowlarr(k, name, e) if _passt(t, k, name, wunsch) and t.get("title") not in gesperrt
@@ -172,7 +180,11 @@ def _verlauf_pruefen(ohrwurm, e):
             alben = ohrwurm.erinnern("alben", {})
             wartende = [i for k, a in list(alben.items()) if a["titel"] == m[2] for i in alben.pop(k)["wartende"]]
             ohrwurm.merken("alben", alben)
-            if f["status"] == "Completed":   # Einsortieren übernimmt Ohrwurm über den Eingang
+            if f["status"] == "Completed":   # Einsortieren übernimmt Ohrwurm über den Eingang; später prüfen, ob es geklappt hat
+                fertig = ohrwurm.erinnern("fertig", {})
+                for i in [int(m[1])] + wartende:
+                    fertig[str(i)] = {"titel": m[2], "zeit": time.time(), "vorher": (ohrwurm.wunsch(i) or {}).get("pfad")}
+                ohrwurm.merken("fertig", fertig)
                 continue
             ohrwurm.merken("gesperrt", (ohrwurm.erinnern("gesperrt", []) + [m[2]])[-500:])
             text = f"SABnzbd: {f.get('fail_message') or 'Download fehlgeschlagen'}"
@@ -181,6 +193,27 @@ def _verlauf_pruefen(ohrwurm, e):
                 x = ohrwurm.wunsch(i)
                 if x and x["stand"] == "in_arbeit" and x["anschluss"] == NAME and not _verarbeite_wunsch(x, ohrwurm, e):
                     ohrwurm.stand(i, "fehlgeschlagen", text=f"{text}, kein weiterer Treffer")
+
+
+def _fertig_pruefen(ohrwurm, e):
+    """Fertiger Download, aber der Wunsch ist nicht erledigt (Lied nicht im Album oder in _unklar):
+    diesen Treffer für den Wunsch sperren und den nächsten nehmen. Für andere Lieder kann er passen."""
+    with _sperre:
+        fertig = ohrwurm.erinnern("fertig", {})
+        for k, v in list(fertig.items()):
+            if time.time() - v["zeit"] < NACH_FERTIG:
+                continue
+            del fertig[k]
+            ohrwurm.merken("fertig", fertig)
+            x = ohrwurm.wunsch(int(k))
+            if not x or (x["stand"] == "erledigt" and x.get("pfad") != v.get("vorher")):
+                continue
+            ohne = ohrwurm.erinnern("ohne_lied", {})
+            ohne[k] = ohne.get(k, []) + [v["titel"]]
+            ohrwurm.merken("ohne_lied", ohne)
+            ohrwurm.protokoll(f"Wunsch {k}: {v['titel']} enthielt das Lied nicht")
+            if x["stand"] == "in_arbeit" and x["anschluss"] == NAME and not _verarbeite_wunsch(x, ohrwurm, e):
+                ohrwurm.stand(x["id"], "fehlgeschlagen", text=f"{v['titel']} enthielt das Lied nicht, kein weiterer Treffer")
 
 
 def _besser_suchen(ohrwurm, e):
@@ -207,7 +240,7 @@ def neuer_wunsch(wunsch, ohrwurm):
 
 def regelmaessig(offene_wuensche, ohrwurm):
     e = _einstellungen(ohrwurm)
-    for name, schritt in (("SABnzbd-Verlauf", _verlauf_pruefen), ("Bessere Fassung", _besser_suchen)):
+    for name, schritt in (("SABnzbd-Verlauf", _verlauf_pruefen), ("Nach dem Download", _fertig_pruefen), ("Bessere Fassung", _besser_suchen)):
         try:
             schritt(ohrwurm, e)
         except Exception as f:
@@ -226,7 +259,7 @@ def treffer(wunsch, ohrwurm):
     """Alle Usenet-Treffer für die Von-Hand-Suche, ohne Filter. Die Kennung ersetzt die Download-Adresse."""
     e, gesperrt, liste = _einstellungen(ohrwurm), set(ohrwurm.erinnern("gesperrt", [])), {}
     for k, name in _suchen(wunsch):
-        for t in _prowlarr(k, name, e):
+        for t in _prowlarr(k, name, e, frisch=True):
             kennung = hashlib.sha1(t["downloadUrl"].encode()).hexdigest()[:16]
             _von_hand[kennung] = t
             liste[kennung] = ({"kennung": kennung, "titel": t.get("title"), "groesse": t.get("size"), "indexer": t.get("indexer"),
