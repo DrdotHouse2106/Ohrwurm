@@ -72,7 +72,7 @@ Ohrregal bekommt eine Künstlerseite im Apple-Stil (Alben, Singles & EPs, Zusamm
 - Läuft auf media-stack als systemd-Dienst `ohrwurm.service` (Einstellungen per Drop-in, `systemctl edit ohrwurm`). Das Docker-Image aus diesem Repo ist die Alternative. Daten in `/daten` (SQLite).
 - Einstellungen über Umgebungsvariablen: `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_SCHLUESSEL` (Pfad zur .p8-Datei, als Datei eingebunden, nie im Repo), `MUSIK` (Musikordner, nur lesen bis auf Ablage), `EINGANG`, `OHRWURM_MELDEN_AN` (optional), `ZUGANG` (Schlüssel für die Schnittstelle).
 - Developer-Token: ES256-JWT, alle 30 Tage neu erzeugt. Bei 401 einmal neu erzeugen und wiederholen.
-- Lidarr kann parallel weiterlaufen. Ohrwurm schreibt nur in Eingang und Ablage.
+- Ohrwurm ersetzt Lidarr (seit 24.11.2026). Downloads nur über Usenet (Prowlarr/SABnzbd), keine Torrents; YouTube als Notlösung. Ohrwurm schreibt nur in Eingang und Ablage.
 
 ## Schritte
 
