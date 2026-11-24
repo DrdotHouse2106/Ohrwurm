@@ -80,3 +80,7 @@ Alle Aufrufe mit `Authorization: Bearer <ZUGANG>`.
 | `DELETE /api/folgen/{id}` | Nicht mehr folgen |
 | `GET /api/neuheiten[?alle=1]` | Neuerscheinungen (ungesehen bzw. alle) |
 | `POST /api/neuheiten/gesehen` | `{"album_ids": […]}` oder `{}` für alle |
+
+## Lizenz
+
+[MIT](LICENSE) – frei nutzbar, auch kommerziell, ohne Gewähr.
