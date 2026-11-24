@@ -15,10 +15,10 @@ import json
 import re
 import threading
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 
-from ohrwurm.abgleich import einfach
 
 NAME = "Prowlarr (SABnzbd)"
 KATEGORIEN = [3000, 3010, 3040]   # Audio, MP3, Lossless: manche Indexer liefern nur mit Unterkategorie
@@ -56,18 +56,42 @@ def _suchen(wunsch):
     return ([(wunsch.get("albumkuenstler") or kuenstler, wunsch["album"])] if wunsch.get("album") else []) + [(kuenstler, wunsch["titel"])]
 
 
+def _indexer(e):
+    """Nur aktive Usenet-Indexer mit Audio: Ein einzelner nicht erreichbarer Indexer kann sonst die Gesamtsuche leeren."""
+    def audio(k): return 3000 <= k.get("id", 0) < 4000 or any(audio(u) for u in k.get("subCategories") or [])
+    liste = _hole(f"{e['PROWLARR_URL'].rstrip('/')}/api/v1/indexer", {"X-Api-Key": e["PROWLARR_KEY"]})
+    return [i["id"] for i in liste if i.get("enable") and i.get("protocol") == "usenet"
+            and any(audio(k) for k in (i.get("capabilities") or {}).get("categories") or [])]
+
+
 def _prowlarr(kuenstler, name, e):
-    params = urllib.parse.urlencode({"query": f"{kuenstler} {name}", "categories": KATEGORIEN, "type": "search"}, doseq=True)
+    werte = {"query": f"{kuenstler} {name}", "categories": KATEGORIEN, "type": "search"}
+    if ids := _indexer(e):
+        werte["indexerIds"] = ids
+    params = urllib.parse.urlencode(werte, doseq=True)
     treffer = _hole(f"{e['PROWLARR_URL'].rstrip('/')}/api/v1/search?{params}", {"X-Api-Key": e["PROWLARR_KEY"]})
     return [t for t in treffer if t.get("protocol") == "usenet" and t.get("downloadUrl")]
 
 
+def _woerter(text, klammern=False):
+    """„Don't Stop (Deluxe)“ → ["dont", "stop"]; ohne Akzente, „&“/„and“ und Klammerzusätze (außer klammern=True)."""
+    t = unicodedata.normalize("NFKD", (text or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c)).replace("'", "").replace("’", "")
+    if not klammern:
+        t = re.sub(r"[\(\[][^)\]]*[\)\]]", " ", t)
+    return [w for w in re.split(r"[^a-z0-9]+", t) if w and w != "and"]
+
+
+def _enthaelt(woerter, folge):
+    """Ganze Wortfolge, kein Teilstück: „21“ trifft nicht „2021“."""
+    return bool(folge) and any(woerter[i:i + len(folge)] == folge for i in range(len(woerter) - len(folge) + 1))
+
+
 def _passt(t, kuenstler, name, wunsch):
-    """Titel enthält Künstler und Album bzw. Lied, keine Remixe und Sonderausgaben (außer der Wunsch sagt es)."""
-    woerter = re.split(r"[^a-z0-9]+", (t.get("title") or "").lower())
-    flach = "".join(woerter)
-    erlaubt = set(re.split(r"[^a-z0-9]+", f"{wunsch.get('titel')} {wunsch.get('album')}".lower()))
-    return einfach(kuenstler) in flach and einfach(name) in flach and not (UNERWUENSCHT & set(woerter)) - erlaubt
+    """Titel enthält Künstler und Album bzw. Lied als Wortfolge, keine Remixe und Sonderausgaben (außer der Wunsch sagt es)."""
+    woerter = _woerter(t.get("title"), klammern=True)
+    erlaubt = set(_woerter(f"{wunsch.get('titel')} {wunsch.get('album')}", klammern=True))
+    return _enthaelt(woerter, _woerter(kuenstler)) and _enthaelt(woerter, _woerter(name)) and not (UNERWUENSCHT & set(woerter)) - erlaubt
 
 
 def _bewertung(t):

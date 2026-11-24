@@ -18,8 +18,12 @@ class Test(unittest.TestCase):
             def log_message(self, *a): pass
             def do_GET(self):
                 q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).items()}
-                if self.path.startswith("/api/v1/search"):
-                    test.fragen.append(q["query"])
+                if self.path.startswith("/api/v1/indexer"):
+                    body = [{"id": 1, "enable": True, "protocol": "usenet", "capabilities": {"categories": [{"id": 3000}]}},
+                            {"id": 2, "enable": True, "protocol": "usenet", "capabilities": {"categories": [{"id": 5000, "subCategories": [{"id": 5070}]}]}},
+                            {"id": 3, "enable": False, "protocol": "usenet", "capabilities": {"categories": [{"id": 3000}]}}]
+                elif self.path.startswith("/api/v1/search"):
+                    test.fragen.append(q["query"]); test.indexer = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("indexerIds")
                     body = [{**r, "protocol": "usenet", "downloadUrl": "http://p/?apikey=GEHEIM&x=" + r["title"]} for r in REL]
                 elif q.get("mode") == "history":
                     body = {"history": {"slots": test.verlauf}}
@@ -52,6 +56,7 @@ class Test(unittest.TestCase):
         self.m.neuer_wunsch(self.wunsch(1, "Get Lucky"), self.o)
         self.m.neuer_wunsch(self.wunsch(2, "Contact"), self.o)
         self.assertEqual(self.fragen, ["Daft Punk Random Access Memories"])
+        self.assertEqual(self.indexer, ["1"])   # nur aktive Usenet-Indexer mit Audio
         self.assertEqual(self.uebergaben, ["[Ohrwurm-1] " + REL[0]["title"]])   # kein Drumless, kein Remix
         self.assertIn("Kommt mit dem Album", self.s.wunsch(2)["text"])
         self.verlauf.insert(0, {"name": self.uebergaben[0], "status": "Failed", "fail_message": "Unvollständig"})
@@ -72,6 +77,18 @@ class Test(unittest.TestCase):
         self.assertNotIn("GEHEIM", json.dumps(treffer))   # Download-Adresse mit Prowlarr-Schlüssel bleibt intern
         self.a.nehmen(3, "Prowlarr (SABnzbd)", treffer[-1]["kennung"])
         self.assertIn("Von Hand", self.s.wunsch(3)["text"])
+
+    def test_passt_wortfolge(self):
+        """Kurze und Zahlen-Namen treffen nur ganze Wörter (Test 24.11.: „21“ traf „2021“)."""
+        p = self.m._passt
+        adele = {"titel": "Set Fire to the Rain", "album": "21"}
+        self.assertFalse(p({"title": "Adele.Easy.On.Me.2021.FLAC.24.Bit"}, "Adele", "21", adele))
+        self.assertTrue(p({"title": "Adele-21-(Deluxe.Edition)-WEB-FLAC-2011"}, "Adele", "21", adele))
+        ts = {"titel": "Style", "album": "1989"}
+        self.assertTrue(p({"title": "Taylor Swift - 1989 (2014) [FLAC]"}, "Taylor Swift", "1989", ts))
+        self.assertFalse(p({"title": "Taylor.Swift-Lover-2019-FLAC"}, "Taylor Swift", "1989", ts))
+        self.assertTrue(p({"title": "Simon.and.Garfunkel-Bookends-FLAC"}, "Simon & Garfunkel", "Bookends", {"album": "Bookends"}))
+        self.assertTrue(p({"title": "Daft.Punk-Random.Access.Memories-WEB"}, "Daft Punk", "Random Access Memories (Deluxe)", {}))
 
 
 if __name__ == "__main__":
